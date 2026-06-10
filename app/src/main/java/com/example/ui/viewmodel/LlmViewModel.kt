@@ -176,12 +176,15 @@ class LlmViewModel(application: Application) : AndroidViewModel(application) {
         val totalMbSize: Double
     )
 
+    private var hasInitializedActiveThread = false
+
     init {
         viewModelScope.launch {
             repository.checkAndSeedModels()
-            // Reactively collect threads to automatically select the active thread as soon as they emit from Room
+            // Reactively collect threads once to select the initial active thread
             repository.allThreads.collect { threads ->
-                if (threads.isNotEmpty() && _activeThreadId.value == null) {
+                if (threads.isNotEmpty() && !hasInitializedActiveThread) {
+                    hasInitializedActiveThread = true
                     _activeThreadId.value = threads.first().id
                     _activeModelId.value = threads.first().selectedModelId
                 }
@@ -536,10 +539,9 @@ class LlmViewModel(application: Application) : AndroidViewModel(application) {
             repository.deleteThread(thread)
             if (_activeThreadId.value == thread.id) {
                 val remThreads = chatThreads.value.filter { it.id != thread.id }
-                if (remThreads.isNotEmpty()) {
-                    _activeThreadId.value = remThreads.first().id
-                    _activeModelId.value = remThreads.first().selectedModelId
-                    loadModelWeights(remThreads.first().selectedModelId)
+                val matchingThread = remThreads.find { it.selectedModelId == _activeModelId.value }
+                if (matchingThread != null) {
+                    _activeThreadId.value = matchingThread.id
                 } else {
                     _activeThreadId.value = null
                 }

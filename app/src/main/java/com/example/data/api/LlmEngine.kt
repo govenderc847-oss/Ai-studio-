@@ -82,46 +82,95 @@ object LlmEngine {
      * API key is omitted, maintaining visual realism.
      */
     fun runOfflineModelSim(prompt: String, modelName: String, phoneModel: String): String {
-        val query = prompt.lowercase()
+        val query = prompt.lowercase().trim()
+        
         return when {
-            query.contains("hello") || query.contains("hi ") || query.contains("hey") -> {
-                "Hello there! I am $modelName, running directly on your $phoneModel. Let me know what you'd like to analyze, compute, or code today. Everything stays 100% offline and secure on your storage drive."
+            query.contains("hello") || query.contains("hi ") || query.contains("hey ") || query.contains("greetings") -> {
+                "Hello there! I am $modelName, running 100% locally and securely on your $phoneModel. It's great to connect!\n\n" +
+                "Unlike cloud-based assistants, every single token I generate is processed entirely within your device's physical memory chips, keeping your conversations private. " +
+                "How can I help you today? You can ask me to write code, solve mathematical formulas, or explain technical details!"
             }
-            query.contains("download") || query.contains("save") || query.contains("install") -> {
-                "To download models in LLM Studio, tap on the catalog tab. When you tap 'Download', the system initiates a background chunk stream, downloading GGUF or SafeTensors files directly into your cache dir. This allows fully standalone computing without cellular networks."
+            query.contains("code") || query.contains("program") || query.contains("write a") || query.contains("function") || query.contains("kotlin") || query.contains("java") || query.contains("python") || query.contains("javascript") || query.contains("html") -> {
+                "### 🖥️ Local Code Generation Node\n" +
+                "I have compiled a clean, optimized on-device routine based on your request. Below is a structured example with commentary:\n\n" +
+                "```kotlin\n" +
+                "// Generated locally by $modelName on $phoneModel\n" +
+                "package com.example.ai\n\n" +
+                "import kotlinx.coroutines.flow.*\n" +
+                "import kotlinx.coroutines.Dispatchers\n" +
+                "import kotlinx.coroutines.withContext\n\n" +
+                "/**\n" +
+                " * Executes specialized tasks while managing system state flow.\n" +
+                " */\n" +
+                "class DeviceTaskExecutor {\n" +
+                "    private val _executionState = MutableStateFlow<String>(\"idle\")\n" +
+                "    val executionState: StateFlow<String> = _executionState.asStateFlow()\n\n" +
+                "    suspend fun executeLocalAlgorithm(input: String): Flow<Int> = flow {\n" +
+                "        _executionState.value = \"running\"\n" +
+                "        val rawTokens = input.split(\" \")\n" +
+                "        for (index in rawTokens.indices) {\n" +
+                "            emit(rawTokens[index].length)\n" +
+                "            kotlinx.coroutines.delay(100) // Simulating edge processing interval\n" +
+                "        }\n" +
+                "        _executionState.value = \"completed\"\n" +
+                "    }.flowOn(Dispatchers.Default)\n" +
+                "}\n" +
+                "```\n\n" +
+                "**Theoretical Performance analysis on $phoneModel:**\n" +
+                "- **Memory Usage:** ~180KB virtual stack allocation, utilizing on-device thread pooling.\n" +
+                "- **Thread Isolation:** Confined entirely inside `Dispatchers.Default`; will not block main-loop rendering.\n\n" +
+                "Let me know if you would like me to adjust this or translate it to Python or Java!"
+            }
+            query.contains("math") || query.contains("calculate") || query.contains("compute") || query.contains("stat") || query.contains("sum") -> {
+                "### 📊 On-Device Mathematical Solver\n" +
+                "As an offline $modelName instance, I can process deterministic numerical algorithms directly in INT4 precision without any packet loss or network latency.\n\n" +
+                "**Analytical Breakdown:**\n" +
+                "1. **Input Query Resolution:** Parses quantitative tokens safely in real-time.\n" +
+                "2. **Algorithm Execution:** Evaluating via standard mathematical formulas.\n\n" +
+                "$$\n" +
+                "f(x) = \\sum_{i=1}^{n} (x_i - \\bar{x})^2\n" +
+                "$$\n\n" +
+                "- **Mean Variance calculation:** Evaluated locally on hardware CPU cores.\n" +
+                "- **Precision Guarantee:** Quantized INT4 weights maintain outstanding (>98.2%) cosine similarity on mathematical tasks compared to raw FP16 parameters.\n\n" +
+                "Tell me the exact equations or values you'd like to compute!"
+            }
+            query.contains("joke") || query.contains("funny") -> {
+                "Why did the local model refuse to run in the cloud?\n\n" +
+                "Because it developed *stratus-phobia* and preferred staying grounded right here in your $phoneModel's RAM! 😂\n\n" +
+                "Since we are running fully offline, it's safe to say there is nobody else listening to these terrible jokes!"
+            }
+            query.contains("weather") || query.contains("temperature") -> {
+                "As an offline AI, I don't have access to active weather broadcast networks or satellites without an active Google Gemini Cloud API key.\n\n" +
+                "However, I can tell you that my current processor core temperature is simulating an optimal thermodynamic range so I can keep generating tokens!\n\n" +
+                "If you connect to the internet and input your Gemini API Key in Settings, I'll be able to query up-to-the-minute atmospheric conditions for you."
             }
             query.contains("quantize") || query.contains("quantization") || query.contains("4-bit") || query.contains("int4") -> {
-                "Quantization reduces the precision of an LLM's weights from 16-bit floats (FP16) to 4-bit integers (INT4). This compresses the memory footprint by ~75% with negligible perplexity loss. It is the secret sauce for running high-intelligence 8B models directly inside your phone's RAM."
+                "### 🗜️ Deep Dive: GGUF & INT4 Quantization on Mobile\n" +
+                "Quantization is a lossy model compression technique. In our catalog, models are quantized into **INT4** (4-bit integers).\n\n" +
+                "**How it works:**\n" +
+                "- **FP16 Weights:** A standard 2-Billion parameter model weighs about 4.4 Gigabytes in full precision.\n" +
+                "- **INT4 Weights:** By mapping continuous 16-bit float values into discrete 4-bit integer buckets (e.g. Q4_K_M), we decrease the package size to around 1.2 - 1.5 Gigabytes.\n" +
+                "- **The Benefit:** It lowers RAM usage by ~70%, making execution completely feasible on standard Android phones with 6GB or 8GB of RAM, while conserving battery!"
             }
-            query.contains("best") || query.contains("phone") || query.contains("hardware") || query.contains("ram") -> {
-                "Your $phoneModel has been vetted by LLM Studio's local hardware benchmark tool. We checked your available CPU cores and physical memory allocation. For your setup, Gemma 2B or Qwen 1.5B is the best fit for high-speed, battery-efficient daily conversation."
-            }
-            query.contains("edge") || query.contains("gallery") || query.contains("google ui") -> {
-                "Google AI Edge (and the MediaPipe LLM Inference task) serves as the primary acceleration layer for executing lightweight weights on Android. In Advanced Settings, you can switch the backend delegate between standard Multi-Threaded CPU and GPU (Vulkan) for faster token generation."
-            }
-            query.contains("llama") -> {
-                "Llama 3 (Meta) is a state-of-the-art open weight transformer. The 8B parameters variant performs incredibly well on mobile benchmarks but demands substantial heap space. Make sure to toggle Vulkan GPU acceleration to sustain acceptable tokens per second."
-            }
-            query.contains("gemma") -> {
-                "Gemma (Google) is built from the same technological lineage as Gemini. The 2B version excels on Android phones because it was specifically co-designed for mobile CPU caching and can run very fast (typically over 15 tokens/sec)."
-            }
-            query.contains("code") || query.contains("write") || query.contains("kotlin") || query.contains("program") -> {
-                """Here is a clean Kotlin snippet demonstrating how to check available free storage on your device:
-
-```kotlin
-import android.os.Environment
-import android.os.StatFs
-
-fun getFreeSpaceGb(): Double {
-    val stat = StatFs(Environment.getDataDirectory().path)
-    val bytes = stat.availableBlocksLong * stat.blockSizeLong
-    return bytes.toDouble() / (1024 * 1024 * 1024)
-}
-```
-You can use state flow to bind this value directly to LLM Studio displays!"""
+            query.contains("llama") || query.contains("gemma") || query.contains("qwen") -> {
+                "### 🧬 Model Architecture Insights\n" +
+                "The **$modelName** model you have selected is built on the modern transformer decoder architecture with several mobile-friendly features:\n\n" +
+                "- **Grouped-Query Attention (GQA):** Reduces KV-cache size so the context window scales with minimal memory bandwidth usage.\n" +
+                "- **SwiGLU Activation:** Increases reasoning density per parameter compared to older ReLU methods.\n" +
+                "- **RoPE (Rotary Position Embeddings):** Allows efficient position encoding.\n\n" +
+                "This ensures that running on your $phoneModel's memory feels incredibly fast and smooth."
             }
             else -> {
-                "I am $modelName, executing safely on your $phoneModel. Since you asked: \"$prompt\", this request was computed entirely on-device using INT4 quantized weights with no servers involved. Your active chat session is auto-saved to Room Database. Type 'code' to see a demonstration or ask about 'quantization'!"
+                "### 🛰️ Local Computation Hub\n" +
+                "Your request: \"$prompt\"\n\n" +
+                "**Inference Process Log:**\n" +
+                "- **Interpreter Type:** Native Mobile LLM Engine\n" +
+                "- **Quantized Precision:** INT4 GGUF\n" +
+                "- **Platform Environment:** Secure On-Device Sandbox ($phoneModel)\n\n" +
+                "**Analytical System Response:**\n" +
+                "I have processed your query entirely locally with 100% privacy! " +
+                "If you'd like to perform complex reasoning or pull real-time web information, you can enter your **Gemini API Key** in the **Settings** panel to enable our high-intelligence hybrid Cloud Backup.\n\n" +
+                "Otherwise, you can ask me system configuration questions, get Kotlin code snippets, or explain local LLM parameters!"
             }
         }
     }
