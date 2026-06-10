@@ -159,13 +159,13 @@ fun LlmStudioApp() {
                 }
             }
         ) { paddingValues ->
-            Row(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues)
-            ) {
-                // Adaptive Navigation Drawer for large width screens (Tablets/Landscape)
-                if (isTablet) {
+            if (isTablet) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(paddingValues)
+                ) {
+                    // Adaptive Navigation Drawer for large width screens (Tablets/Landscape)
                     NavigationRail(
                         containerColor = MaterialTheme.colorScheme.surface,
                         modifier = Modifier.fillMaxHeight(),
@@ -231,11 +231,24 @@ fun LlmStudioApp() {
                             )
                         )
                     }
-                }
 
-                Box(modifier = Modifier.fillMaxSize()) {
+                    Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
+                        when (currentTab) {
+                            0 -> ChatPlaygroundScreen(viewModel, true)
+                            1 -> ModelsCatalogScreen(viewModel)
+                            2 -> BenchmarksScreen(viewModel)
+                            3 -> SettingsAndHardwareScreen(viewModel)
+                        }
+                    }
+                }
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(paddingValues)
+                ) {
                     when (currentTab) {
-                        0 -> ChatPlaygroundScreen(viewModel, isTablet)
+                        0 -> ChatPlaygroundScreen(viewModel, false)
                         1 -> ModelsCatalogScreen(viewModel)
                         2 -> BenchmarksScreen(viewModel)
                         3 -> SettingsAndHardwareScreen(viewModel)
@@ -1111,9 +1124,8 @@ fun ChatPlaygroundScreen(viewModel: LlmViewModel, isTablet: Boolean) {
     var promptInput by remember { mutableStateOf("") }
     val keyboardController = LocalSoftwareKeyboardController.current
 
-    // Sidebar overlay in landscape mode
-    Row(modifier = Modifier.fillMaxSize()) {
-        if (isTablet) {
+    if (isTablet) {
+        Row(modifier = Modifier.fillMaxSize()) {
             // Persistent sidebar showing chat history list on large screens
             Column(
                 modifier = Modifier
@@ -1156,176 +1168,227 @@ fun ChatPlaygroundScreen(viewModel: LlmViewModel, isTablet: Boolean) {
                     }
                 }
             }
-         // Action Core Playground Area
+
+            // Action Core Playground Area for Tablet
+            Column(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .weight(1f)
+                    .background(MaterialTheme.colorScheme.background)
+            ) {
+                PlaygroundMainContent(
+                    viewModel = viewModel,
+                    activeModelId = activeModelId,
+                    models = models,
+                    chatThreads = chatThreads,
+                    activeThreadId = activeThreadId,
+                    activeMessages = activeMessages,
+                    isGenerating = isGenerating,
+                    isTablet = true,
+                    promptInput = promptInput,
+                    onPromptInputChange = { promptInput = it },
+                    keyboardController = keyboardController
+                )
+            }
+        }
+    } else {
+        // Simple direct full-screen visual viewport for Mobile
         Column(
             modifier = Modifier
-                .fillMaxHeight()
-                .weight(1f)
+                .fillMaxSize()
                 .background(MaterialTheme.colorScheme.background)
         ) {
-            // Interactive Mini Header for Active Model and stats
-            ActiveChatHeader(
+            PlaygroundMainContent(
                 viewModel = viewModel,
                 activeModelId = activeModelId,
                 models = models,
                 chatThreads = chatThreads,
                 activeThreadId = activeThreadId,
-                isTablet = isTablet
+                activeMessages = activeMessages,
+                isGenerating = isGenerating,
+                isTablet = false,
+                promptInput = promptInput,
+                onPromptInputChange = { promptInput = it },
+                keyboardController = keyboardController
             )
+        }
+    }
+}
 
-            val isLoadingModel by viewModel.isLoadingModel.collectAsStateWithLifecycle()
-            val modelLoadingProgressVal by viewModel.modelLoadingProgressVal.collectAsStateWithLifecycle()
-            val modelLoadingProgressText by viewModel.modelLoadingProgressText.collectAsStateWithLifecycle()
+@Composable
+fun ColumnScope.PlaygroundMainContent(
+    viewModel: LlmViewModel,
+    activeModelId: String,
+    models: List<DownloadedModel>,
+    chatThreads: List<ChatThread>,
+    activeThreadId: Int?,
+    activeMessages: List<ChatMessage>,
+    isGenerating: Boolean,
+    isTablet: Boolean,
+    promptInput: String,
+    onPromptInputChange: (String) -> Unit,
+    keyboardController: androidx.compose.ui.platform.SoftwareKeyboardController?
+) {
+    // Interactive Mini Header for Active Model and stats
+    ActiveChatHeader(
+        viewModel = viewModel,
+        activeModelId = activeModelId,
+        models = models,
+        chatThreads = chatThreads,
+        activeThreadId = activeThreadId,
+        isTablet = isTablet
+    )
 
-            if (isLoadingModel != null) {
-                ModelInitializationOverlay(
-                    viewModel = viewModel,
-                    modelId = isLoadingModel!!,
-                    progress = modelLoadingProgressVal,
-                    progressText = modelLoadingProgressText
-                )
+    val isLoadingModel by viewModel.isLoadingModel.collectAsStateWithLifecycle()
+    val modelLoadingProgressVal by viewModel.modelLoadingProgressVal.collectAsStateWithLifecycle()
+    val modelLoadingProgressText by viewModel.modelLoadingProgressText.collectAsStateWithLifecycle()
+
+    if (isLoadingModel != null) {
+        ModelInitializationOverlay(
+            viewModel = viewModel,
+            modelId = isLoadingModel!!,
+            progress = modelLoadingProgressVal,
+            progressText = modelLoadingProgressText
+        )
+    } else {
+        // Dynamic conversation viewport
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+        ) {
+            if (activeThreadId == null || chatThreads.isEmpty()) {
+                EmptyChatState { selectedModelId ->
+                    viewModel.createNewChat(selectedModelId)
+                }
             } else {
-                // Dynamic conversation viewport
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth()
-                ) {
-                    if (activeThreadId == null || chatThreads.isEmpty()) {
-                        EmptyChatState { selectedModelId ->
-                            viewModel.createNewChat(selectedModelId)
-                        }
-                    } else {
-                        val listState = rememberLazyListState()
+                val listState = rememberLazyListState()
 
-                        // Scroll to bottom every time a message is added or streamed
-                        LaunchedEffect(activeMessages.size, isGenerating) {
-                            if (activeMessages.isNotEmpty()) {
-                                listState.animateScrollToItem(activeMessages.size - 1)
-                            }
-                        }
-
-                        LazyColumn(
-                            state = listState,
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(horizontal = 16.dp),
-                            contentPadding = PaddingValues(top = 16.dp, bottom = 120.dp)
-                        ) {
-                            items(activeMessages, key = { it.id }) { message ->
-                                ChatMessageBubble(message = message, phoneSpecs = viewModel.phoneSpecs)
-                            }
-                            if (isGenerating && activeMessages.lastOrNull()?.sender == "user") {
-                                item {
-                                    AssistantLoadingBubble()
-                                }
-                            }
-                        }
-                    }
-
-                    // Cozy Bottom floating visual panel of prompt suggestions
-                    if (activeMessages.isEmpty() && activeThreadId != null) {
-                        Box(
-                            modifier = Modifier
-                                .align(Alignment.BottomCenter)
-                                .padding(bottom = 96.dp)
-                        ) {
-                            SuggestionRow { tappedPrompt ->
-                                promptInput = tappedPrompt
-                            }
-                        }
+                // Scroll to bottom every time a message is added or streamed
+                LaunchedEffect(activeMessages.size, isGenerating) {
+                    if (activeMessages.isNotEmpty()) {
+                        listState.animateScrollToItem(activeMessages.size - 1)
                     }
                 }
 
-                // Input Send Field Frame
-                if (activeThreadId != null) {
-                    Surface(
-                        color = MaterialTheme.colorScheme.surface,
-                        tonalElevation = 4.dp,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            IconButton(
-                                onClick = {
-                                    val model = models.find { it.id == activeModelId }
-                                    model?.let {
-                                        promptInput = "Under ${viewModel.selectedProvider.value}, analyze structural performance metrics of ${it.name} models on custom ${viewModel.phoneSpecs.cpuCores}-core chips."
-                                    }
-                                },
-                                modifier = Modifier.size(48.dp)
-                            ) {
-                                Icon(
-                                    Icons.Default.AutoAwesome,
-                                    contentDescription = "Quick Query Prompt Helper",
-                                    tint = MaterialTheme.colorScheme.primary
-                                )
-                            }
-
-                            TextField(
-                                value = promptInput,
-                                onValueChange = { promptInput = it },
-                                placeholder = { Text("Ask local model anything...", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)) },
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .testTag("chat_input"),
-                                colors = TextFieldDefaults.colors(
-                                    focusedContainerColor = Color.Transparent,
-                                    unfocusedContainerColor = Color.Transparent,
-                                    disabledContainerColor = Color.Transparent,
-                                    focusedIndicatorColor = Color.Transparent,
-                                    unfocusedIndicatorColor = Color.Transparent
-                                ),
-                                keyboardOptions = KeyboardOptions(
-                                    imeAction = ImeAction.Send
-                                ),
-                                keyboardActions = KeyboardActions(
-                                    onSend = {
-                                        if (promptInput.isNotBlank() && !isGenerating) {
-                                            viewModel.sendMessageInActiveThread(promptInput)
-                                            promptInput = ""
-                                            keyboardController?.hide()
-                                        }
-                                    }
-                                ),
-                                enabled = !isGenerating,
-                                maxLines = 4
-                            )
-
-                            Spacer(modifier = Modifier.width(8.dp))
-
-                            IconButton(
-                                onClick = {
-                                    if (promptInput.isNotBlank() && !isGenerating) {
-                                        viewModel.sendMessageInActiveThread(promptInput)
-                                        promptInput = ""
-                                        keyboardController?.hide()
-                                    }
-                                },
-                                modifier = Modifier
-                                    .size(48.dp)
-                                    .background(
-                                        color = if (promptInput.isNotBlank() && !isGenerating) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
-                                        shape = CircleShape
-                                    )
-                                    .testTag("chat_send_button"),
-                                enabled = promptInput.isNotBlank() && !isGenerating
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Send,
-                                    contentDescription = "Send prompt button",
-                                    tint = if (promptInput.isNotBlank() && !isGenerating) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-                                )
-                            }
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 16.dp),
+                    contentPadding = PaddingValues(top = 16.dp, bottom = 120.dp)
+                ) {
+                    items(activeMessages, key = { it.id }) { message ->
+                        ChatMessageBubble(message = message, phoneSpecs = viewModel.phoneSpecs)
+                    }
+                    if (isGenerating && activeMessages.lastOrNull()?.sender == "user") {
+                        item {
+                            AssistantLoadingBubble()
                         }
                     }
                 }
             }
+
+            // Cozy Bottom floating visual panel of prompt suggestions
+            if (activeMessages.isEmpty() && activeThreadId != null) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 96.dp)
+                ) {
+                    SuggestionRow { tappedPrompt ->
+                        onPromptInputChange(tappedPrompt)
+                    }
+                }
+            }
         }
+
+        // Input Send Field Frame
+        if (activeThreadId != null) {
+            Surface(
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 4.dp,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(
+                        onClick = {
+                            val model = models.find { it.id == activeModelId }
+                            model?.let {
+                                onPromptInputChange("Under ${viewModel.selectedProvider.value}, analyze structural performance metrics of ${it.name} models on custom ${viewModel.phoneSpecs.cpuCores}-core chips.")
+                            }
+                        },
+                        modifier = Modifier.size(48.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.AutoAwesome,
+                            contentDescription = "Quick Query Prompt Helper",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+
+                    TextField(
+                        value = promptInput,
+                        onValueChange = onPromptInputChange,
+                        placeholder = { Text("Ask local model anything...", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)) },
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag("chat_input"),
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = Color.Transparent,
+                            unfocusedContainerColor = Color.Transparent,
+                            disabledContainerColor = Color.Transparent,
+                            focusedIndicatorColor = Color.Transparent,
+                            unfocusedIndicatorColor = Color.Transparent
+                        ),
+                        keyboardOptions = KeyboardOptions(
+                            imeAction = ImeAction.Send
+                        ),
+                        keyboardActions = KeyboardActions(
+                            onSend = {
+                                if (promptInput.isNotBlank() && !isGenerating) {
+                                    viewModel.sendMessageInActiveThread(promptInput)
+                                    onPromptInputChange("")
+                                    keyboardController?.hide()
+                                }
+                            }
+                        ),
+                        enabled = !isGenerating,
+                        maxLines = 4
+                    )
+
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    IconButton(
+                        onClick = {
+                            if (promptInput.isNotBlank() && !isGenerating) {
+                                viewModel.sendMessageInActiveThread(promptInput)
+                                onPromptInputChange("")
+                                keyboardController?.hide()
+                            }
+                        },
+                        modifier = Modifier
+                            .size(48.dp)
+                            .background(
+                                color = if (promptInput.isNotBlank() && !isGenerating) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
+                                shape = CircleShape
+                            )
+                            .testTag("chat_send_button"),
+                        enabled = promptInput.isNotBlank() && !isGenerating
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Send,
+                            contentDescription = "Send prompt button",
+                            tint = if (promptInput.isNotBlank() && !isGenerating) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                        )
+                    }
+                }
+            }
         }
     }
 }
