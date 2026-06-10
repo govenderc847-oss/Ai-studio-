@@ -179,11 +179,12 @@ class LlmViewModel(application: Application) : AndroidViewModel(application) {
     init {
         viewModelScope.launch {
             repository.checkAndSeedModels()
-            // Set first thread as active if exists or leave empty
-            val threads = repository.allThreads.first()
-            if (threads.isNotEmpty()) {
-                _activeThreadId.value = threads.first().id
-                _activeModelId.value = threads.first().selectedModelId
+            // Reactively collect threads to automatically select the active thread as soon as they emit from Room
+            repository.allThreads.collect { threads ->
+                if (threads.isNotEmpty() && _activeThreadId.value == null) {
+                    _activeThreadId.value = threads.first().id
+                    _activeModelId.value = threads.first().selectedModelId
+                }
             }
         }
     }
