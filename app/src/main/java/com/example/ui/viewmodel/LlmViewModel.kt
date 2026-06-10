@@ -106,12 +106,20 @@ class LlmViewModel(application: Application) : AndroidViewModel(application) {
 
     fun loadModelWeights(modelId: String, onFinished: () -> Unit = {}) {
         modelLoadingJob?.cancel()
-        _isLoadingModel.value = modelId
-        _modelLoadingProgressVal.value = 0f
-        _modelLoadingProgressText.value = "Initializing memory descriptors..."
 
         modelLoadingJob = viewModelScope.launch(Dispatchers.Default) {
             val model = repository.getModelById(modelId)
+            val isDownloaded = model?.isDownloaded ?: false
+            if (!isDownloaded) {
+                _isLoadingModel.value = null
+                onFinished()
+                return@launch
+            }
+
+            _isLoadingModel.value = modelId
+            _modelLoadingProgressVal.value = 0f
+            _modelLoadingProgressText.value = "Initializing memory descriptors..."
+
             val modelName = model?.name ?: "Local Model"
             
             val steps = listOf(
@@ -502,6 +510,7 @@ class LlmViewModel(application: Application) : AndroidViewModel(application) {
                 repository.updateModelDownloadState(modelId, isDownloaded = true, isDownloading = false, progress = 1.0f)
                 _downloadMetrics.update { it - modelId }
                 downloadingJobs.remove(modelId)
+                loadModelWeights(modelId)
                 
             } catch (e: Exception) {
                 Log.e("LlmViewModel", "Error downloading model: $modelId", e)

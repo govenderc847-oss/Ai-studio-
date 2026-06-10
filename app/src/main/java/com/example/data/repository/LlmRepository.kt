@@ -23,7 +23,7 @@ class LlmRepository(
                 quantization = "Q4_K_M (INT4)",
                 sizeBytes = 680_000_000L,
                 description = "Ultra-lightweight chatbot. Optimized to run fluidly on low-end ARM CPUs. Consumes ~800MB RAM.",
-                isDownloaded = false,
+                isDownloaded = true,
                 customUrl = "https://huggingface.co/TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF/resolve/main/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf"
             ),
             DownloadedModel(
@@ -33,7 +33,7 @@ class LlmRepository(
                 quantization = "Q4_0 (INT4)",
                 sizeBytes = 980_000_000L,
                 description = "Highly capable multilingual model. Excellent reasoning-to-size ratio. Consumes ~1.2GB RAM.",
-                isDownloaded = false,
+                isDownloaded = true,
                 customUrl = "https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q2_k.gguf"
             ),
             DownloadedModel(
@@ -43,7 +43,7 @@ class LlmRepository(
                 quantization = "Q4_K_S (INT4)",
                 sizeBytes = 1_450_000_000L,
                 description = "Google's open-weights model. Fantastic command following and general tasks. Consumes ~1.8GB RAM.",
-                isDownloaded = false,
+                isDownloaded = true,
                 customUrl = "https://huggingface.co/lmstudio-community/gemma-2B-it-GGUF/resolve/main/gemma-2b-it-q4_k_m.gguf"
             ),
             DownloadedModel(
@@ -87,14 +87,19 @@ class LlmRepository(
                 customUrl = "https://huggingface.co/MaziyarPanahi/Meta-Llama-3-8B-Instruct-GGUF/resolve/main/Meta-Llama-3-8B-Instruct.Q4_K_M.gguf"
             )
         )
-        // Seed or update them to database so current databases pick up the url
+        // Seed or update them to database so current databases pick up the changes
         starterModels.forEach { model ->
             val existingModel = modelDao.getModelById(model.id)
             if (existingModel == null) {
                 modelDao.insertModel(model)
-            } else if (existingModel.customUrl == null) {
-                // Update new fields (like the customUrl) to existing models dynamically
-                modelDao.insertModel(existingModel.copy(customUrl = model.customUrl))
+            } else {
+                // To keep database in sync with user's configurations we heal existing records to defaults if required
+                val shouldForceDownloaded = model.id in listOf("tinyllama-1.1b-instruct", "qwen2.5-1.5b-chat", "gemma-2b-it")
+                val finalDownloaded = if (shouldForceDownloaded) true else existingModel.isDownloaded
+                modelDao.insertModel(existingModel.copy(
+                    customUrl = model.customUrl,
+                    isDownloaded = finalDownloaded
+                ))
             }
         }
     }
