@@ -38,7 +38,9 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import com.example.data.database.BenchmarkResult
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -71,133 +73,1027 @@ class MainActivity : ComponentActivity() {
 fun LlmStudioApp() {
     val viewModel: LlmViewModel = viewModel()
     val currentTab by viewModel.currentTab.collectAsStateWithLifecycle()
+    val completedTutorial by viewModel.completedTutorial.collectAsStateWithLifecycle()
+    
     val configuration = LocalConfiguration.current
     val isTablet = configuration.screenWidthDp >= 640
+    val snackbarHostState = remember { SnackbarHostState() }
+    val context = LocalContext.current
+    
+    // Listen for cellular/WiFi warnings
+    LaunchedEffect(Unit) {
+        viewModel.wifiError.collect { errorMsg ->
+            snackbarHostState.showSnackbar(
+                message = errorMsg,
+                duration = SnackbarDuration.Long
+            )
+        }
+    }
 
-    Scaffold(
+    if (!completedTutorial) {
+        OnboardingTutorialScreen(viewModel)
+    } else {
+        Scaffold(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
+                .statusBarsPadding()
+                .navigationBarsPadding(),
+            snackbarHost = { SnackbarHost(snackbarHostState) },
+            bottomBar = {
+                if (!isTablet) {
+                    NavigationBar(
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        tonalElevation = 6.dp,
+                        windowInsets = WindowInsets.navigationBars
+                    ) {
+                        NavigationBarItem(
+                            selected = currentTab == 0,
+                            onClick = { viewModel.selectTab(0) },
+                            icon = { Icon(Icons.Default.ChatBubble, contentDescription = "Chats") },
+                            label = { Text("Playground") },
+                            colors = NavigationBarItemDefaults.colors(
+                                selectedIconColor = MaterialTheme.colorScheme.primary,
+                                selectedTextColor = MaterialTheme.colorScheme.primary,
+                                indicatorColor = MaterialTheme.colorScheme.surfaceVariant
+                            ),
+                            modifier = Modifier.testTag("tab_chats")
+                        )
+                        NavigationBarItem(
+                            selected = currentTab == 1,
+                            onClick = { viewModel.selectTab(1) },
+                            icon = { Icon(Icons.Default.CloudDownload, contentDescription = "Models") },
+                            label = { Text("Models") },
+                            colors = NavigationBarItemDefaults.colors(
+                                selectedIconColor = MaterialTheme.colorScheme.primary,
+                                selectedTextColor = MaterialTheme.colorScheme.primary,
+                                indicatorColor = MaterialTheme.colorScheme.surfaceVariant
+                            ),
+                            modifier = Modifier.testTag("tab_models")
+                        )
+                        NavigationBarItem(
+                            selected = currentTab == 2,
+                            onClick = { viewModel.selectTab(2) },
+                            icon = { Icon(Icons.Default.Speed, contentDescription = "Benchmarks") },
+                            label = { Text("Benchmarks") },
+                            colors = NavigationBarItemDefaults.colors(
+                                selectedIconColor = MaterialTheme.colorScheme.primary,
+                                selectedTextColor = MaterialTheme.colorScheme.primary,
+                                indicatorColor = MaterialTheme.colorScheme.surfaceVariant
+                            ),
+                            modifier = Modifier.testTag("tab_benchmarks")
+                        )
+                        NavigationBarItem(
+                            selected = currentTab == 3,
+                            onClick = { viewModel.selectTab(3) },
+                            icon = { Icon(Icons.Default.Settings, contentDescription = "Settings") },
+                            label = { Text("Settings") },
+                            colors = NavigationBarItemDefaults.colors(
+                                selectedIconColor = MaterialTheme.colorScheme.primary,
+                                selectedTextColor = MaterialTheme.colorScheme.primary,
+                                indicatorColor = MaterialTheme.colorScheme.surfaceVariant
+                            ),
+                            modifier = Modifier.testTag("tab_settings")
+                        )
+                    }
+                }
+            }
+        ) { paddingValues ->
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+            ) {
+                // Adaptive Navigation Drawer for large width screens (Tablets/Landscape)
+                if (isTablet) {
+                    NavigationRail(
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        modifier = Modifier.fillMaxHeight(),
+                        header = {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier.padding(vertical = 16.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Memory,
+                                    contentDescription = "LLM Studio Logo",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(32.dp)
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    "LLM Studio",
+                                    fontWeight = FontWeight.Bold,
+                                    style = MaterialTheme.typography.titleSmall,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+                    ) {
+                        NavigationRailItem(
+                            selected = currentTab == 0,
+                            onClick = { viewModel.selectTab(0) },
+                            icon = { Icon(Icons.Default.ChatBubble, contentDescription = "Chats") },
+                            label = { Text("Playground") },
+                            colors = NavigationRailItemDefaults.colors(
+                                selectedIconColor = MaterialTheme.colorScheme.primary,
+                                indicatorColor = MaterialTheme.colorScheme.surfaceVariant
+                            )
+                        )
+                        NavigationRailItem(
+                            selected = currentTab == 1,
+                            onClick = { viewModel.selectTab(1) },
+                            icon = { Icon(Icons.Default.CloudDownload, contentDescription = "Models") },
+                            label = { Text("Catalog") },
+                            colors = NavigationRailItemDefaults.colors(
+                                selectedIconColor = MaterialTheme.colorScheme.primary,
+                                indicatorColor = MaterialTheme.colorScheme.surfaceVariant
+                            )
+                        )
+                        NavigationRailItem(
+                            selected = currentTab == 2,
+                            onClick = { viewModel.selectTab(2) },
+                            icon = { Icon(Icons.Default.Speed, contentDescription = "Benchmarks") },
+                            label = { Text("Benchmarks") },
+                            colors = NavigationRailItemDefaults.colors(
+                                selectedIconColor = MaterialTheme.colorScheme.primary,
+                                indicatorColor = MaterialTheme.colorScheme.surfaceVariant
+                            )
+                        )
+                        NavigationRailItem(
+                            selected = currentTab == 3,
+                            onClick = { viewModel.selectTab(3) },
+                            icon = { Icon(Icons.Default.Settings, contentDescription = "Settings") },
+                            label = { Text("Settings") },
+                            colors = NavigationRailItemDefaults.colors(
+                                selectedIconColor = MaterialTheme.colorScheme.primary,
+                                indicatorColor = MaterialTheme.colorScheme.surfaceVariant
+                            )
+                        )
+                    }
+                }
+
+                Box(modifier = Modifier.fillMaxSize()) {
+                    when (currentTab) {
+                        0 -> ChatPlaygroundScreen(viewModel, isTablet)
+                        1 -> ModelsCatalogScreen(viewModel)
+                        2 -> BenchmarksScreen(viewModel)
+                        3 -> SettingsAndHardwareScreen(viewModel)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun OnboardingTutorialScreen(viewModel: LlmViewModel) {
+    var step by remember { mutableStateOf(0) }
+    val context = LocalContext.current
+    val workspacePath by viewModel.workspacePath.collectAsStateWithLifecycle()
+    val workspaceStatus by viewModel.workspaceStatus.collectAsStateWithLifecycle()
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(
+                        Color(0xFF0F0C20), // Dark Cosmic Slate
+                        Color(0xFF15102A)  // Deep Violet Slate
+                    )
+                )
+            )
+            .padding(24.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Card(
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.93f)),
+            shape = RoundedCornerShape(24.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .widthIn(max = 500.dp)
+                .border(
+                    width = 1.dp,
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
+                    shape = RoundedCornerShape(24.dp)
+                )
+        ) {
+            Column(
+                modifier = Modifier.padding(28.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Header progress dots
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.padding(bottom = 24.dp)
+                ) {
+                    repeat(3) { index ->
+                        Box(
+                            modifier = Modifier
+                                .size(if (step == index) 12.dp else 8.dp)
+                                .clip(CircleShape)
+                                .background(
+                                    if (step == index) MaterialTheme.colorScheme.primary 
+                                    else MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
+                                )
+                        )
+                    }
+                }
+
+                when (step) {
+                    0 -> {
+                        Icon(
+                            imageVector = Icons.Default.Memory,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(72.dp)
+                        )
+                        Spacer(modifier = Modifier.height(20.dp))
+                        Text(
+                            text = "Welcome to LLM Studio Mobile",
+                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.headlineSmall,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = "Execute state-of-the-art open-weights Large Language Models (LLMs) directly inside your phone's memory. 100% offline, private, and secure.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.mutedText,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(horizontal = 8.dp)
+                        )
+                        Spacer(modifier = Modifier.height(32.dp))
+                        Button(
+                            onClick = { step = 1 },
+                            modifier = Modifier.fillMaxWidth().height(48.dp)
+                        ) {
+                            Text("Next: Storage Setup")
+                        }
+                    }
+                    1 -> {
+                        Icon(
+                            imageVector = Icons.Default.FolderOpen,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.tertiary,
+                            modifier = Modifier.size(72.dp)
+                        )
+                        Spacer(modifier = Modifier.height(20.dp))
+                        Text(
+                            text = "Structured Storage Directories",
+                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.headlineSmall,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = "To keep things fully organized, we must configure a local folders architecture on your disk space. We will create a parent folder containing nested folders representing model weights and active chats:",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.mutedText,
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        
+                        // Folders tree
+                        Surface(
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                FolderLineItem(name = "📁 LLM_Studio (Parent)", depth = 0)
+                                FolderLineItem(name = "  📁 models     (Drop weights here!)", depth = 1)
+                                FolderLineItem(name = "  📁 chat_data  (Auto-saves conversations)", depth = 1)
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        if (workspacePath.isNullOrEmpty()) {
+                            Button(
+                                onClick = { viewModel.initializeWorkspaceDirectories(context) },
+                                modifier = Modifier.fillMaxWidth().height(48.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                            ) {
+                                Icon(Icons.Default.CreateNewFolder, contentDescription = null)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Generate Workspace Directories")
+                            }
+                        } else {
+                            Surface(
+                                color = Color(0xFF1E3A1E),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.padding(12.dp)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color.Green)
+                                        Spacer(modifier = Modifier.width(10.dp))
+                                        Text(
+                                            text = "Workspace initialized inside storage!",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = Color.Green,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                    }
+                                    if (workspaceStatus != null) {
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text(
+                                            text = workspaceStatus ?: "",
+                                            fontSize = 10.sp,
+                                            fontFamily = FontFamily.Monospace,
+                                            color = Color.LightGray
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(24.dp))
+                        Row(
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            TextButton(onClick = { step = 0 }) {
+                                Text("Back")
+                            }
+                            Button(
+                                onClick = { step = 2 },
+                                enabled = !workspacePath.isNullOrEmpty()
+                            ) {
+                                Text("Next")
+                            }
+                        }
+                    }
+                    2 -> {
+                        Icon(
+                            imageVector = Icons.Default.CloudDownload,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.secondary,
+                            modifier = Modifier.size(72.dp)
+                        )
+                        Spacer(modifier = Modifier.height(20.dp))
+                        Text(
+                            text = "Physical Model Sideloads",
+                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.headlineSmall,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = "You don't need active WiFi to load! You can transfer downloaded GGUF/bin weights from elsewhere on your PC, place them inside the 'LLM_Studio/models' subdirectory on your storage space, and clicking 'Scan Folder' inside LLM Studio will auto-discover and load them instantly.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.mutedText,
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Surface(
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)
+                        ) {
+                            Text(
+                                text = "Path:\n${workspacePath}/models/",
+                                fontSize = 11.sp,
+                                fontFamily = FontFamily.Monospace,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(12.dp),
+                                textAlign = TextAlign.Center
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(32.dp))
+
+                        Row(
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            TextButton(onClick = { step = 1 }) {
+                                Text("Back")
+                            }
+                            Button(
+                                onClick = { viewModel.completeOnboarding() },
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                            ) {
+                                Text("Enter Sandbox Hub")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun FolderLineItem(name: String, depth: Int) {
+    Text(
+        text = name,
+        style = MaterialTheme.typography.bodyMedium,
+        fontFamily = FontFamily.Monospace,
+        color = if (depth == 0) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.mutedText,
+        modifier = Modifier.padding(vertical = 4.dp)
+    )
+}
+
+@Composable
+fun BenchmarksScreen(viewModel: LlmViewModel) {
+    val models by viewModel.models.collectAsStateWithLifecycle()
+    val benchmarks by viewModel.benchmarks.collectAsStateWithLifecycle()
+    val isBenchmarking by viewModel.isBenchmarking.collectAsStateWithLifecycle()
+    val progressText by viewModel.benchmarkProgressText.collectAsStateWithLifecycle()
+    val progressVal by viewModel.benchmarkProgressVal.collectAsStateWithLifecycle()
+    val activeProvider by viewModel.selectedProvider.collectAsStateWithLifecycle()
+
+    val downloadedModels = remember(models) { models.filter { it.isDownloaded } }
+    var selectedModelId by remember { mutableStateOf("") }
+    
+    // Auto-select the first downloaded model
+    LaunchedEffect(downloadedModels) {
+        if (selectedModelId.isEmpty() && downloadedModels.isNotEmpty()) {
+            selectedModelId = downloadedModels.first().id
+        }
+    }
+
+    LazyColumn(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
-            .statusBarsPadding()
-            .navigationBarsPadding(),
-        bottomBar = {
-            if (!isTablet) {
-                NavigationBar(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    tonalElevation = 6.dp,
-                    windowInsets = WindowInsets.navigationBars
+            .padding(horizontal = 16.dp),
+        contentPadding = PaddingValues(top = 16.dp, bottom = 32.dp)
+    ) {
+        item {
+            Text(
+                "DEEP HARDWARE BENCHMARK SUITE",
+                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.primary,
+                letterSpacing = 0.5.sp,
+                modifier = Modifier.padding(bottom = 6.dp)
+            )
+            Text(
+                "Profile local INT4 tensor decompression, decoding matrices, memory bandwidths and thermals safely on your phone.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.mutedText,
+                modifier = Modifier.padding(bottom = 20.dp)
+            )
+        }
+
+        if (isBenchmarking) {
+            item {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(
+                            width = 1.dp,
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
+                            shape = RoundedCornerShape(16.dp)
+                        )
                 ) {
-                    NavigationBarItem(
-                        selected = currentTab == 0,
-                        onClick = { viewModel.selectTab(0) },
-                        icon = { Icon(Icons.Default.ChatBubble, contentDescription = "Chats") },
-                        label = { Text("Playground") },
-                        colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = MaterialTheme.colorScheme.primary,
-                            selectedTextColor = MaterialTheme.colorScheme.primary,
-                            indicatorColor = MaterialTheme.colorScheme.surfaceVariant
-                        ),
-                        modifier = Modifier.testTag("tab_chats")
+                    Column(
+                        modifier = Modifier.padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        CircularProgressIndicator(
+                            progress = { progressVal },
+                            modifier = Modifier.size(72.dp),
+                            color = MaterialTheme.colorScheme.primary,
+                            strokeWidth = 6.dp
+                        )
+                        Spacer(modifier = Modifier.height(24.dp))
+                        Text(
+                            text = progressText,
+                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        LinearProgressIndicator(
+                            progress = { progressVal },
+                            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(4.dp)),
+                            color = MaterialTheme.colorScheme.primary,
+                            trackColor = MaterialTheme.colorScheme.surfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Estimated Time Remaining: ${(4.0 * (1.0f - progressVal)).toInt()}s",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.mutedText
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(24.dp))
+            }
+        } else {
+            item {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(
+                            width = 1.dp,
+                            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f),
+                            shape = RoundedCornerShape(16.dp)
+                        )
+                ) {
+                    Column(modifier = Modifier.padding(18.dp)) {
+                        Text(
+                            "RUN BENCHMARK ENGINE",
+                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        if (downloadedModels.isEmpty()) {
+                            Surface(
+                                color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f),
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.padding(14.dp)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(Icons.Default.Error, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            "No Local Weights Installed!",
+                                            fontWeight = FontWeight.SemiBold,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onErrorContainer
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Text(
+                                        "You must download or sideload at least one model from the Catalog tab before starting the local hardware profiling.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.8f)
+                                    )
+                                }
+                            }
+                        } else {
+                            Text(
+                                "SELECT MODEL FOR PROFILING",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.mutedText
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            
+                            var expandedDropdown by remember { mutableStateOf(false) }
+                            val activeModelSelected = downloadedModels.find { it.id == selectedModelId }
+                            
+                            Box(modifier = Modifier.fillMaxWidth()) {
+                                Surface(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { expandedDropdown = true }
+                                        .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f), RoundedCornerShape(8.dp)),
+                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(12.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = activeModelSelected?.name ?: "Select downloaded model",
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                        Icon(Icons.Default.ArrowDropDown, contentDescription = null)
+                                    }
+                                }
+                                
+                                DropdownMenu(
+                                    expanded = expandedDropdown,
+                                    onDismissRequest = { expandedDropdown = false },
+                                    modifier = Modifier.fillMaxWidth(0.9f)
+                                ) {
+                                    downloadedModels.forEach { m ->
+                                        DropdownMenuItem(
+                                            text = { Text(m.name, fontWeight = FontWeight.SemiBold) },
+                                            onClick = {
+                                                selectedModelId = m.id
+                                                expandedDropdown = false
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(16.dp))
+
+                            Text(
+                                "COMPUTATION DELEGATE BACKEND",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.mutedText
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                listOf("GPU-Vulkan", "CPU-TFLite", "NNAPI-Hexagon").forEach { prov ->
+                                    val isSel = activeProvider == prov
+                                    Surface(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clickable { viewModel.selectedProvider.value = prov },
+                                        color = if (isSel) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                                        shape = RoundedCornerShape(8.dp),
+                                        border = BorderStroke(1.dp, if (isSel) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
+                                    ) {
+                                        Text(
+                                            text = prov.replace("-", "\n"),
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            textAlign = TextAlign.Center,
+                                            color = if (isSel) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
+                                            modifier = Modifier.padding(vertical = 10.dp)
+                                        )
+                                    }
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(24.dp))
+
+                            Button(
+                                onClick = { viewModel.runModelBenchmark(selectedModelId) },
+                                modifier = Modifier.fillMaxWidth().height(48.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                            ) {
+                                Icon(Icons.Default.PlayArrow, contentDescription = null)
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Execute Chips Benchmark")
+                            }
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(24.dp))
+            }
+        }
+
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "PROFILING HISTORY RECORDS",
+                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    letterSpacing = 1.sp
+                )
+                if (benchmarks.isNotEmpty()) {
+                    TextButton(onClick = { viewModel.clearBenchmarks() }) {
+                        Icon(Icons.Default.DeleteSweep, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Clear Logs", style = MaterialTheme.typography.labelSmall)
+                    }
+                }
+            }
+        }
+
+        if (benchmarks.isEmpty()) {
+            item {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f)),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Icon(
+                            Icons.Default.History,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.mutedText.copy(alpha = 0.5f),
+                            modifier = Modifier.size(40.dp)
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            "No Benchmark History Logged Yet",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.mutedText,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+            }
+        } else {
+            items(benchmarks, key = { it.id }) { record ->
+                BenchmarkResultRow(record = record, onDelete = { viewModel.deleteBenchmark(record) })
+            }
+        }
+    }
+}
+
+@Composable
+fun BenchmarkResultRow(record: BenchmarkResult, onDelete: () -> Unit) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp)
+            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f), RoundedCornerShape(12.dp))
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(
+                        text = record.modelName,
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
-                    NavigationBarItem(
-                        selected = currentTab == 1,
-                        onClick = { viewModel.selectTab(1) },
-                        icon = { Icon(Icons.Default.CloudDownload, contentDescription = "Models") },
-                        label = { Text("Models") },
-                        colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = MaterialTheme.colorScheme.primary,
-                            selectedTextColor = MaterialTheme.colorScheme.primary,
-                            indicatorColor = MaterialTheme.colorScheme.surfaceVariant
-                        ),
-                        modifier = Modifier.testTag("tab_models")
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Surface(
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                            shape = RoundedCornerShape(4.dp),
+                            modifier = Modifier.padding(end = 6.dp)
+                        ) {
+                            Text(
+                                text = record.executionProvider,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                        Text(
+                            text = java.text.SimpleDateFormat("MMM dd, yyyy - HH:mm", java.util.Locale.getDefault()).format(record.timestamp),
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.mutedText
+                        )
+                    }
+                }
+
+                Surface(
+                    color = when {
+                        record.score >= 1200 -> Color(0xFFD4AF37).copy(alpha = 0.18f) // Gold
+                        record.score >= 600 -> Color(0xFFC0C0C0).copy(alpha = 0.18f) // Silver
+                        else -> Color(0xFFCD7F32).copy(alpha = 0.18f) // Bronze
+                    },
+                    shape = RoundedCornerShape(8.dp),
+                    border = BorderStroke(
+                        width = 1.dp,
+                        color = when {
+                            record.score >= 1200 -> Color(0xFFD4AF37)
+                            record.score >= 600 -> Color(0xFFC0C0C0)
+                            else -> Color(0xFFCD7F32)
+                        }
                     )
-                    NavigationBarItem(
-                        selected = currentTab == 2,
-                        onClick = { viewModel.selectTab(2) },
-                        icon = { Icon(Icons.Default.Settings, contentDescription = "Settings") },
-                        label = { Text("Settings") },
-                        colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = MaterialTheme.colorScheme.primary,
-                            selectedTextColor = MaterialTheme.colorScheme.primary,
-                            indicatorColor = MaterialTheme.colorScheme.surfaceVariant
-                        ),
-                        modifier = Modifier.testTag("tab_settings")
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
+                        Text(
+                            text = "INDEX SCORE",
+                            fontSize = 8.sp,
+                            fontWeight = FontWeight.Black,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = "${record.score}",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = when {
+                                record.score >= 1200 -> Color(0xFFD4AF37)
+                                record.score >= 600 -> Color(0xFFE2E2E2)
+                                else -> Color(0xFFCD7F32)
+                            }
+                        )
+                    }
+                }
+            }
+
+            Divider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f), modifier = Modifier.padding(vertical = 12.dp))
+
+            // Micro dashboard metrics
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                MicroMetricItem(
+                    label = "DECODE SPEED",
+                    value = "${"%.1f".format(record.tokensPerSecond)} t/s",
+                    desc = "Higher is better"
+                )
+                MicroMetricItem(
+                    label = "PREFILL LATENCY",
+                    value = "${record.timeToFirstTokenMs} ms",
+                    desc = "Lower is better"
+                )
+                MicroMetricItem(
+                    label = "HEAP LOAD",
+                    value = "${"%.0f".format(record.ramConsumedMb)} MB",
+                    desc = "RAM footprint"
+                )
+                MicroMetricItem(
+                    label = "THERMAL INFL",
+                    value = "+${"%.1f".format(record.tempDeltaCelsius)}°C",
+                    desc = "Temp Delta"
+                )
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                horizontalArrangement = Arrangement.End
+            ) {
+                IconButton(
+                    onClick = onDelete,
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = "Delete record",
+                        tint = MaterialTheme.colorScheme.mutedText.copy(alpha = 0.6f),
+                        modifier = Modifier.size(18.dp)
                     )
                 }
             }
         }
-    ) { paddingValues ->
-        Row(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-        ) {
-            // Adaptive Navigation Drawer for large width screens (Tablets/Landscape)
-            if (isTablet) {
-                NavigationRail(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    modifier = Modifier.fillMaxHeight(),
-                    header = {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            modifier = Modifier.padding(vertical = 16.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Memory,
-                                contentDescription = "LLM Studio Logo",
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(32.dp)
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                "LLM Studio",
-                                fontWeight = FontWeight.Bold,
-                                style = MaterialTheme.typography.titleSmall,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                    }
-                ) {
-                    NavigationRailItem(
-                        selected = currentTab == 0,
-                        onClick = { viewModel.selectTab(0) },
-                        icon = { Icon(Icons.Default.ChatBubble, contentDescription = "Chats") },
-                        label = { Text("Playground") },
-                        colors = NavigationRailItemDefaults.colors(
-                            selectedIconColor = MaterialTheme.colorScheme.primary,
-                            indicatorColor = MaterialTheme.colorScheme.surfaceVariant
-                        )
-                    )
-                    NavigationRailItem(
-                        selected = currentTab == 1,
-                        onClick = { viewModel.selectTab(1) },
-                        icon = { Icon(Icons.Default.CloudDownload, contentDescription = "Models") },
-                        label = { Text("Catalog") },
-                        colors = NavigationRailItemDefaults.colors(
-                            selectedIconColor = MaterialTheme.colorScheme.primary,
-                            indicatorColor = MaterialTheme.colorScheme.surfaceVariant
-                        )
-                    )
-                    NavigationRailItem(
-                        selected = currentTab == 2,
-                        onClick = { viewModel.selectTab(2) },
-                        icon = { Icon(Icons.Default.Settings, contentDescription = "Settings") },
-                        label = { Text("Settings") },
-                        colors = NavigationRailItemDefaults.colors(
-                            selectedIconColor = MaterialTheme.colorScheme.primary,
-                            indicatorColor = MaterialTheme.colorScheme.surfaceVariant
-                        )
-                    )
-                }
+    }
+}
+
+@Composable
+fun MicroMetricItem(label: String, value: String, desc: String) {
+    Column {
+        Text(
+            text = label,
+            fontSize = 9.sp,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.mutedText
+        )
+        Text(
+            text = value,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Text(
+            text = desc,
+            fontSize = 8.sp,
+            color = MaterialTheme.colorScheme.mutedText.copy(alpha = 0.7f)
+        )
+    }
+}
+
+@Composable
+fun ImportDiskFolderCard(viewModel: LlmViewModel) {
+    val context = LocalContext.current
+    val workspacePath by viewModel.workspacePath.collectAsStateWithLifecycle()
+    val scanProgress by viewModel.scanProgress.collectAsStateWithLifecycle()
+
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)),
+        shape = RoundedCornerShape(16.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(
+                width = 1.dp,
+                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
+                shape = RoundedCornerShape(16.dp)
+            )
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Default.FolderOpen,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.secondary,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "LOCAL SIDELOADING PORT",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.secondary
+                )
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "Transfer downloaded GGUF/bin weights into your subfolders, then trigger the auto-import scan below.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.mutedText
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Surface(
+                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.6f),
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = if (!workspacePath.isNullOrEmpty()) ".../LLM_Studio/models/" else "Workspace not configured!",
+                    fontSize = 11.sp,
+                    fontFamily = FontFamily.Monospace,
+                    modifier = Modifier.padding(8.dp),
+                    color = MaterialTheme.colorScheme.primary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+            
+            Button(
+                onClick = { viewModel.scanLocalModelsFolder(context) },
+                modifier = Modifier.fillMaxWidth().height(40.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Icon(Icons.Default.Sync, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("Scan 'LLM_Studio/models' Folder", style = MaterialTheme.typography.labelMedium)
             }
 
-            Box(modifier = Modifier.fillMaxSize()) {
-                when (currentTab) {
-                    0 -> ChatPlaygroundScreen(viewModel, isTablet)
-                    1 -> ModelsCatalogScreen(viewModel)
-                    2 -> SettingsAndHardwareScreen(viewModel)
+            if (scanProgress != null) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Surface(
+                    color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f),
+                    shape = RoundedCornerShape(6.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = scanProgress ?: "",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.secondary,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)
+                    )
                 }
             }
+        }
+    }
+}
+
+@Composable
+fun ModelsCatalogScreen(viewModel: LlmViewModel) {
+    val models by viewModel.models.collectAsStateWithLifecycle()
+    val downloadMetrics by viewModel.downloadMetrics.collectAsStateWithLifecycle()
+    val phoneSpecs = viewModel.phoneSpecs
+    val context = LocalContext.current
+
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .padding(horizontal = 16.dp),
+        contentPadding = PaddingValues(top = 16.dp, bottom = 32.dp)
+    ) {
+        // High-end hardware checking module (PROFILER)
+        item {
+            HardwareProfilerCard(phoneSpecs = phoneSpecs)
+            Spacer(modifier = Modifier.height(16.dp))
+            ImportDiskFolderCard(viewModel = viewModel)
+            Spacer(modifier = Modifier.height(24.dp))
+            Text(
+                "AVAILABLE MOBILE MODELS",
+                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary,
+                letterSpacing = 1.sp,
+                modifier = Modifier.padding(bottom = 12.dp)
+            )
+        }
+
+        items(models, key = { it.id }) { model ->
+            val metrics = downloadMetrics[model.id]
+            val isRecommended = model.id == phoneSpecs.recommendedModelId
+
+            // Warning checking logic, e.g. if the user only has 4GB and model is 5GB weights
+            val totalRamGb = phoneSpecs.totalRamGb
+            val isRamHazard = (model.id == "phi-3-mini" && totalRamGb < 5.0) ||
+                    (model.id == "llama-3-8b-it" && totalRamGb < 9.0) ||
+                    (model.id == "gemma-4-9b-it" && totalRamGb < 9.5)
+
+            ModelCatalogRow(
+                model = model,
+                metrics = metrics,
+                isRecommended = isRecommended,
+                isRamHazard = isRamHazard,
+                onDownload = { viewModel.startDownload(context, model.id) },
+                onDelete = { viewModel.deleteDownloadedModel(model.id) },
+                onUse = { viewModel.createNewChat(model.id) }
+            )
         }
     }
 }
@@ -989,54 +1885,7 @@ fun SuggestionRow(onSelectPrompt: (String) -> Unit) {
     }
 }
 
-@Composable
-fun ModelsCatalogScreen(viewModel: LlmViewModel) {
-    val models by viewModel.models.collectAsStateWithLifecycle()
-    val downloadMetrics by viewModel.downloadMetrics.collectAsStateWithLifecycle()
-    val phoneSpecs = viewModel.phoneSpecs
 
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .padding(horizontal = 16.dp),
-        contentPadding = PaddingValues(top = 16.dp, bottom = 32.dp)
-    ) {
-        // High-end hardware checking module (PROFILER)
-        item {
-            HardwareProfilerCard(phoneSpecs = phoneSpecs)
-            Spacer(modifier = Modifier.height(24.dp))
-            Text(
-                "AVAILABLE MOBILE MODELS",
-                fontWeight = FontWeight.Bold,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.primary,
-                letterSpacing = 1.sp,
-                modifier = Modifier.padding(bottom = 12.dp)
-            )
-        }
-
-        items(models, key = { it.id }) { model ->
-            val metrics = downloadMetrics[model.id]
-            val isRecommended = model.id == phoneSpecs.recommendedModelId
-
-            // Warning checking logic, e.g. if the user only has 4GB and model is 5GB weights
-            val totalRamGb = phoneSpecs.totalRamGb
-            val isRamHazard = (model.id == "phi-3-mini" && totalRamGb < 5.0) ||
-                    (model.id == "llama-3-8b-it" && totalRamGb < 9.0)
-
-            ModelCatalogRow(
-                model = model,
-                metrics = metrics,
-                isRecommended = isRecommended,
-                isRamHazard = isRamHazard,
-                onDownload = { viewModel.startDownload(model.id) },
-                onDelete = { viewModel.deleteDownloadedModel(model.id) },
-                onUse = { viewModel.createNewChat(model.id) }
-            )
-        }
-    }
-}
 
 @Composable
 fun HardwareProfilerCard(phoneSpecs: PhoneSpecs) {

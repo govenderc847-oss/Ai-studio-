@@ -36,3 +36,17 @@ data class DownloadedModel(
     val downloadProgress: Float = 0.0f,
     val customUrl: String? = null
 )
+
+@Entity(tableName = "benchmark_results")
+data class BenchmarkResult(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val modelId: String,
+    val modelName: String,
+    val executionProvider: String, // "CPU-TFLite", "GPU-Vulkan", "NNAPI"
+    val timestamp: Long = System.currentTimeMillis(),
+    val tokensPerSecond: Double,
+    val timeToFirstTokenMs: Long,
+    val ramConsumedMb: Double,
+    val tempDeltaCelsius: Double,
+    val score: Int
+)

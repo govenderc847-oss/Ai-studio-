@@ -7,14 +7,17 @@ import kotlinx.coroutines.flow.first
 class LlmRepository(
     private val chatDao: ChatDao,
     private val messageDao: MessageDao,
-    private val modelDao: ModelDao
+    private val modelDao: ModelDao,
+    private val benchmarkDao: BenchmarkDao
 ) {
     val allThreads: Flow<List<ChatThread>> = chatDao.getAllThreads()
     val allModels: Flow<List<DownloadedModel>> = modelDao.getAllModels()
+    val allBenchmarks: Flow<List<BenchmarkResult>> = benchmarkDao.getAllBenchmarks()
 
     suspend fun checkAndSeedModels() {
         val existing = modelDao.getAllModelsDirect()
-        if (existing.isEmpty()) {
+        if (existing.isEmpty() || existing.none { it.id.contains("gemma-4") }) {
+            // Seed base starter models + new Gemma 4 models
             val starterModels = listOf(
                 DownloadedModel(
                     id = "tinyllama-1.1b-instruct",
@@ -44,6 +47,24 @@ class LlmRepository(
                     isDownloaded = false
                 ),
                 DownloadedModel(
+                    id = "gemma-4-2b-it",
+                    name = "Gemma 4 2B IT (Beta)",
+                    parameterCount = "2.5 Billion",
+                    quantization = "Q4_0_F16 (INT4)",
+                    sizeBytes = 1_650_000_000L,
+                    description = "Next-generation Google edge model (Developer Beta). Revolutionary reasoning capabilities, multimodal parsing, and ultra-high coding accuracy. Consumes ~2.1GB RAM.",
+                    isDownloaded = false
+                ),
+                DownloadedModel(
+                    id = "gemma-4-9b-it",
+                    name = "Gemma 4 9B IT (Preview)",
+                    parameterCount = "9.2 Billion",
+                    quantization = "Q4_K_M (INT4)",
+                    sizeBytes = 5_400_000_000L,
+                    description = "SOTA edge intelligence (Developer Preview). Advanced planning, deep logic, and coding prowess. Vetted for flagship chips. Consumes ~6.2GB RAM.",
+                    isDownloaded = false
+                ),
+                DownloadedModel(
                     id = "phi-3-mini",
                     name = "Phi-3 Mini Instruct (Microsoft)",
                     parameterCount = "3.8 Billion",
@@ -62,8 +83,26 @@ class LlmRepository(
                     isDownloaded = false
                 )
             )
-            modelDao.insertModels(starterModels)
+            // Save them to database
+            starterModels.forEach { model ->
+                val existingModel = modelDao.getModelById(model.id)
+                if (existingModel == null) {
+                    modelDao.insertModel(model)
+                }
+            }
         }
+    }
+
+    suspend fun insertBenchmark(result: BenchmarkResult) {
+        benchmarkDao.insertBenchmark(result)
+    }
+
+    suspend fun deleteBenchmark(result: BenchmarkResult) {
+        benchmarkDao.deleteBenchmark(result)
+    }
+
+    suspend fun clearAllBenchmarks() {
+        benchmarkDao.clearAllBenchmarks()
     }
 
     suspend fun getModelById(id: String): DownloadedModel? {

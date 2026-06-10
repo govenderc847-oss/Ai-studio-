@@ -53,3 +53,18 @@ interface ModelDao {
     @Query("UPDATE downloaded_models SET isDownloaded = :isDownloaded, isDownloading = :isDownloading, downloadProgress = :progress WHERE id = :id")
     suspend fun updateDownloadState(id: String, isDownloaded: Boolean, isDownloading: Boolean, progress: Float)
 }
+
+@Dao
+interface BenchmarkDao {
+    @Query("SELECT * FROM benchmark_results ORDER BY timestamp DESC")
+    fun getAllBenchmarks(): Flow<List<BenchmarkResult>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertBenchmark(result: BenchmarkResult): Long
+
+    @Delete
+    suspend fun deleteBenchmark(result: BenchmarkResult)
+
+    @Query("DELETE FROM benchmark_results")
+    suspend fun clearAllBenchmarks()
+}
