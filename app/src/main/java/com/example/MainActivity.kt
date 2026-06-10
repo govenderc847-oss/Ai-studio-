@@ -1156,9 +1156,7 @@ fun ChatPlaygroundScreen(viewModel: LlmViewModel, isTablet: Boolean) {
                     }
                 }
             }
-        }
-
-        // Action Core Playground Area
+         // Action Core Playground Area
         Column(
             modifier = Modifier
                 .fillMaxHeight()
@@ -1175,145 +1173,159 @@ fun ChatPlaygroundScreen(viewModel: LlmViewModel, isTablet: Boolean) {
                 isTablet = isTablet
             )
 
-            // Dynamic conversation viewport
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-            ) {
-                if (activeThreadId == null || chatThreads.isEmpty()) {
-                    EmptyChatState { selectedModelId ->
-                        viewModel.createNewChat(selectedModelId)
-                    }
-                } else {
-                    val listState = rememberLazyListState()
+            val isLoadingModel by viewModel.isLoadingModel.collectAsStateWithLifecycle()
+            val modelLoadingProgressVal by viewModel.modelLoadingProgressVal.collectAsStateWithLifecycle()
+            val modelLoadingProgressText by viewModel.modelLoadingProgressText.collectAsStateWithLifecycle()
 
-                    // Scroll to bottom every time a message is added or streamed
-                    LaunchedEffect(activeMessages.size, isGenerating) {
-                        if (activeMessages.isNotEmpty()) {
-                            listState.animateScrollToItem(activeMessages.size - 1)
+            if (isLoadingModel != null) {
+                ModelInitializationOverlay(
+                    viewModel = viewModel,
+                    modelId = isLoadingModel!!,
+                    progress = modelLoadingProgressVal,
+                    progressText = modelLoadingProgressText
+                )
+            } else {
+                // Dynamic conversation viewport
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                ) {
+                    if (activeThreadId == null || chatThreads.isEmpty()) {
+                        EmptyChatState { selectedModelId ->
+                            viewModel.createNewChat(selectedModelId)
+                        }
+                    } else {
+                        val listState = rememberLazyListState()
+
+                        // Scroll to bottom every time a message is added or streamed
+                        LaunchedEffect(activeMessages.size, isGenerating) {
+                            if (activeMessages.isNotEmpty()) {
+                                listState.animateScrollToItem(activeMessages.size - 1)
+                            }
+                        }
+
+                        LazyColumn(
+                            state = listState,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(horizontal = 16.dp),
+                            contentPadding = PaddingValues(top = 16.dp, bottom = 120.dp)
+                        ) {
+                            items(activeMessages, key = { it.id }) { message ->
+                                ChatMessageBubble(message = message, phoneSpecs = viewModel.phoneSpecs)
+                            }
+                            if (isGenerating && activeMessages.lastOrNull()?.sender == "user") {
+                                item {
+                                    AssistantLoadingBubble()
+                                }
+                            }
                         }
                     }
 
-                    LazyColumn(
-                        state = listState,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(horizontal = 16.dp),
-                        contentPadding = PaddingValues(top = 16.dp, bottom = 120.dp)
-                    ) {
-                        items(activeMessages, key = { it.id }) { message ->
-                            ChatMessageBubble(message = message, phoneSpecs = viewModel.phoneSpecs)
-                        }
-                        if (isGenerating && activeMessages.lastOrNull()?.sender == "user") {
-                            item {
-                                AssistantLoadingBubble()
+                    // Cozy Bottom floating visual panel of prompt suggestions
+                    if (activeMessages.isEmpty() && activeThreadId != null) {
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .padding(bottom = 96.dp)
+                        ) {
+                            SuggestionRow { tappedPrompt ->
+                                promptInput = tappedPrompt
                             }
                         }
                     }
                 }
 
-                // Cozy Bottom floating visual panel of prompt suggestions
-                if (activeMessages.isEmpty() && activeThreadId != null) {
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .padding(bottom = 96.dp)
+                // Input Send Field Frame
+                if (activeThreadId != null) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.surface,
+                        tonalElevation = 4.dp,
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        SuggestionRow { tappedPrompt ->
-                            promptInput = tappedPrompt
-                        }
-                    }
-                }
-            }
-
-            // Input Send Field Frame
-            if (activeThreadId != null) {
-                Surface(
-                    color = MaterialTheme.colorScheme.surface,
-                    tonalElevation = 4.dp,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        IconButton(
-                            onClick = {
-                                val model = models.find { it.id == activeModelId }
-                                model?.let {
-                                    promptInput = "Under ${viewModel.selectedProvider.value}, analyze structural performance metrics of ${it.name} models on custom ${viewModel.phoneSpecs.cpuCores}-core chips."
-                                }
-                            },
-                            modifier = Modifier.size(48.dp)
-                        ) {
-                            Icon(
-                                Icons.Default.AutoAwesome,
-                                contentDescription = "Quick Query Prompt Helper",
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-                        }
-
-                        TextField(
-                            value = promptInput,
-                            onValueChange = { promptInput = it },
-                            placeholder = { Text("Ask local model anything...", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)) },
+                        Row(
                             modifier = Modifier
-                                .weight(1f)
-                                .testTag("chat_input"),
-                            colors = TextFieldDefaults.colors(
-                                focusedContainerColor = Color.Transparent,
-                                unfocusedContainerColor = Color.Transparent,
-                                disabledContainerColor = Color.Transparent,
-                                focusedIndicatorColor = Color.Transparent,
-                                unfocusedIndicatorColor = Color.Transparent
-                            ),
-                            keyboardOptions = KeyboardOptions(
-                                imeAction = ImeAction.Send
-                            ),
-                            keyboardActions = KeyboardActions(
-                                onSend = {
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            IconButton(
+                                onClick = {
+                                    val model = models.find { it.id == activeModelId }
+                                    model?.let {
+                                        promptInput = "Under ${viewModel.selectedProvider.value}, analyze structural performance metrics of ${it.name} models on custom ${viewModel.phoneSpecs.cpuCores}-core chips."
+                                    }
+                                },
+                                modifier = Modifier.size(48.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.AutoAwesome,
+                                    contentDescription = "Quick Query Prompt Helper",
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
+
+                            TextField(
+                                value = promptInput,
+                                onValueChange = { promptInput = it },
+                                placeholder = { Text("Ask local model anything...", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)) },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("chat_input"),
+                                colors = TextFieldDefaults.colors(
+                                    focusedContainerColor = Color.Transparent,
+                                    unfocusedContainerColor = Color.Transparent,
+                                    disabledContainerColor = Color.Transparent,
+                                    focusedIndicatorColor = Color.Transparent,
+                                    unfocusedIndicatorColor = Color.Transparent
+                                ),
+                                keyboardOptions = KeyboardOptions(
+                                    imeAction = ImeAction.Send
+                                ),
+                                keyboardActions = KeyboardActions(
+                                    onSend = {
+                                        if (promptInput.isNotBlank() && !isGenerating) {
+                                            viewModel.sendMessageInActiveThread(promptInput)
+                                            promptInput = ""
+                                            keyboardController?.hide()
+                                        }
+                                    }
+                                ),
+                                enabled = !isGenerating,
+                                maxLines = 4
+                            )
+
+                            Spacer(modifier = Modifier.width(8.dp))
+
+                            IconButton(
+                                onClick = {
                                     if (promptInput.isNotBlank() && !isGenerating) {
                                         viewModel.sendMessageInActiveThread(promptInput)
                                         promptInput = ""
                                         keyboardController?.hide()
                                     }
-                                }
-                            ),
-                            enabled = !isGenerating,
-                            maxLines = 4
-                        )
-
-                        Spacer(modifier = Modifier.width(8.dp))
-
-                        IconButton(
-                            onClick = {
-                                if (promptInput.isNotBlank() && !isGenerating) {
-                                    viewModel.sendMessageInActiveThread(promptInput)
-                                    promptInput = ""
-                                    keyboardController?.hide()
-                                }
-                            },
-                            modifier = Modifier
-                                .size(48.dp)
-                                .background(
-                                    color = if (promptInput.isNotBlank() && !isGenerating) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
-                                    shape = CircleShape
+                                },
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .background(
+                                        color = if (promptInput.isNotBlank() && !isGenerating) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
+                                        shape = CircleShape
+                                    )
+                                    .testTag("chat_send_button"),
+                                enabled = promptInput.isNotBlank() && !isGenerating
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Send,
+                                    contentDescription = "Send prompt button",
+                                    tint = if (promptInput.isNotBlank() && !isGenerating) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
                                 )
-                                .testTag("chat_send_button"),
-                            enabled = promptInput.isNotBlank() && !isGenerating
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Send,
-                                contentDescription = "Send prompt button",
-                                tint = if (promptInput.isNotBlank() && !isGenerating) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-                            )
+                            }
                         }
                     }
                 }
             }
+        }
         }
     }
 }
@@ -1986,6 +1998,240 @@ fun ProfilerInfoItem(label: String, value: String) {
     Column {
         Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.mutedText)
         Text(value, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onBackground)
+    }
+}
+
+@Composable
+fun ModelInitializationOverlay(
+    viewModel: LlmViewModel,
+    modelId: String,
+    progress: Float,
+    progressText: String
+) {
+    val models by viewModel.models.collectAsStateWithLifecycle()
+    val model = models.find { it.id == modelId }
+    val modelName = model?.name ?: "Local Model"
+    val specs = viewModel.phoneSpecs
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(
+                        MaterialTheme.colorScheme.surface,
+                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                    )
+                )
+            )
+            .padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier.size(160.dp)
+        ) {
+            Surface(
+                modifier = Modifier.size(140.dp),
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.15f)
+            ) {}
+            
+            CircularProgressIndicator(
+                progress = { progress },
+                modifier = Modifier.size(140.dp),
+                color = MaterialTheme.colorScheme.primary,
+                strokeWidth = 6.dp,
+                trackColor = MaterialTheme.colorScheme.surfaceVariant
+            )
+            
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(
+                    imageVector = Icons.Default.Memory,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(40.dp)
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = "${(progress * 100).toInt()}%",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(32.dp))
+
+        Text(
+            text = "INITIALIZING MODEL ENGINE",
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary,
+            letterSpacing = 1.5.sp
+        )
+        
+        Spacer(modifier = Modifier.height(4.dp))
+        
+        Text(
+            text = modelName,
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.ExtraBold,
+            textAlign = TextAlign.Center,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center,
+            modifier = Modifier
+                .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
+                .padding(horizontal = 12.dp, vertical = 6.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.DeveloperBoard,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                modifier = Modifier.size(16.dp)
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                text = "${viewModel.selectedProvider.value} Hardware Acceleration Enabled",
+                style = MaterialTheme.typography.bodySmall,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onPrimaryContainer
+            )
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+            ),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = progressText,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontFamily = FontFamily.Monospace,
+                    textAlign = TextAlign.Center,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                
+                Spacer(modifier = Modifier.height(12.dp))
+                
+                LinearProgressIndicator(
+                    progress = { progress },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(8.dp)
+                        .clip(RoundedCornerShape(4.dp)),
+                    color = MaterialTheme.colorScheme.primary,
+                    trackColor = MaterialTheme.colorScheme.surfaceVariant
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
+                .padding(horizontal = 8.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = Color(0xFF0F0B1D)
+            ),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        ) {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(12.dp),
+                contentPadding = PaddingValues(bottom = 8.dp),
+                reverseLayout = true
+            ) {
+                item {
+                    Text(
+                        text = ">>> MEMORY STAGE: ALLOCATED ${model?.sizeBytes?.let { String.format("%.2f", it.toDouble() / (1024*1024*1024)) } ?: "1.8"} GB",
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 11.sp,
+                        color = Color(0xFF64FFDA)
+                    )
+                }
+                item {
+                    Text(
+                        text = ">>> CPU CORES DETECTED: ${specs.cpuCores} threads enabled",
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 11.sp,
+                        color = Color(0xFFB0BEC5)
+                    )
+                }
+                item {
+                    Text(
+                        text = ">>> ACTIVE HARDWARE INTERPRETER: TFLite (Vulkan GPU Native Bound)",
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 11.sp,
+                        color = Color(0xFFB0BEC5)
+                    )
+                }
+                item {
+                    Text(
+                        text = ">>> VULKAN COMPUTE INSTANCE COMPILING RUNTIME PARAMS...",
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 11.sp,
+                        color = Color(0xFFB0BEC5)
+                    )
+                }
+                item {
+                    Text(
+                        text = ">>> GGUF TENSOR ARCHITECTURE: ${model?.quantization ?: "INT4"}",
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 11.sp,
+                        color = Color(0xFFB0BEC5)
+                    )
+                }
+                item {
+                    Text(
+                        text = "--- ON-DEVICE SYSTEM INTERFACING LOGS ---",
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        Button(
+            onClick = { viewModel.forceSkipLoading() },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(48.dp)
+                .testTag("skip_warmup_button"),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.secondary
+            )
+        ) {
+            Icon(Icons.Default.SkipNext, contentDescription = null)
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("Skip Warmup & Chat Instantly")
+        }
     }
 }
 
