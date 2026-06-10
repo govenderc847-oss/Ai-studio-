@@ -87,6 +87,7 @@ roborazzi-compose = { group = "io.github.takahirom.roborazzi", name = "roborazzi
 roborazzi-junit-rule = { group = "io.github.takahirom.roborazzi", name = "roborazzi-junit-rule", version.ref = "roborazzi" }
 firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.ref = "firebaseBom" }
 firebase-ai = { group = "com.google.firebase", name = "firebase-ai" }
+mediapipe-tasks-genai = { group = "com.google.mediapipe", name = "tasks-genai", version = "0.10.14" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

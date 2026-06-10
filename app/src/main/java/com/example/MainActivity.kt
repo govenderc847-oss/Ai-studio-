@@ -2479,6 +2479,23 @@ fun ModelInitializationOverlay(
                 }
             }
         }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Button(
+            onClick = { viewModel.forceSkipLoading() },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(48.dp)
+                .testTag("skip_warmup_button"),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.secondary
+            )
+        ) {
+            Icon(Icons.Default.SkipNext, contentDescription = null)
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("Skip Warmup & Chat Instantly")
+        }
     }
 }
 

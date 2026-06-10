@@ -128,9 +128,9 @@ class LlmViewModel(application: Application) : AndroidViewModel(application) {
                 "Finalizing model loading. Ready for on-device execution!" to 100
             )
 
-            // 60-second loading countdown matching Google AI Edge Gallery
-            val totalSeconds = 60
-            val sleepDuration = (totalSeconds * 1000) / 100 // 600ms per 1%
+            // 4-second highly reactive warm-up loading countdown
+            val totalSeconds = 4
+            val sleepDuration = (totalSeconds * 1000) / 100 // 40ms per 1%
 
             for (percent in 1..100) {
                 delay(sleepDuration.toLong())
@@ -637,17 +637,38 @@ class LlmViewModel(application: Application) : AndroidViewModel(application) {
             // Let's decide how to answer. We call the real Gemini call as a smart cloud backup.
             // If the model is not downloaded, we inform them first or use custom cloud fallbacks.
             var rawResponse: String? = null
-            if (!isModelDownloaded) {
-                rawResponse = "⚠️ WARNING: This model ($finalModelName) is NOT downloaded locally. Falling back to Google Gemini Cloud API...\n\n"
-            }
-
-            val apiResponse = LlmEngine.generateResponseWithGemini(promptClean, customApiKey.value)
-            if (apiResponse != null) {
-                rawResponse = (rawResponse ?: "") + apiResponse
+            if (isModelDownloaded) {
+                // We have the downloaded model! Execute real on-device local inference.
+                val parentDir = java.io.File(getApplication<Application>().getExternalFilesDir(null), "LLM_Studio")
+                val modelsDir = java.io.File(parentDir, "models")
+                val filename = if (currentModelId!!.contains(".") || currentModelId.endsWith(".gguf") || currentModelId.endsWith(".bin") || currentModelId.endsWith(".onnx") || currentModelId.endsWith(".json")) {
+                    currentModelId
+                } else {
+                    "$currentModelId.gguf"
+                }
+                val modelFile = java.io.File(modelsDir, filename)
+                
+                rawResponse = LlmEngine.runOnDeviceInference(
+                    context = getApplication(),
+                    prompt = promptClean,
+                    modelName = finalModelName,
+                    modelId = currentModelId,
+                    phoneModel = phoneModelFriendly,
+                    modelFile = modelFile
+                )
             } else {
-                // If offline / placeholder key, retrieve immersive thematic answer
-                val offlineAns = LlmEngine.runOfflineModelSim(promptClean, finalModelName, phoneModelFriendly)
-                rawResponse = (rawResponse ?: "") + offlineAns
+                // Model not downloaded! We must run online via Gemini API cloud fallback.
+                val apiResponse = LlmEngine.generateResponseWithGemini(promptClean, customApiKey.value)
+                if (apiResponse != null) {
+                    rawResponse = apiResponse
+                } else {
+                    // No model downloaded AND no API key provided! Ask the user to do either.
+                    rawResponse = "### ⚠️ Model Execution Error\n" +
+                            "This model (**$finalModelName**) has not been downloaded to your device yet, and no active Google Gemini cloud API key was detected in the Settings panel.\n\n" +
+                            "**To start chatting, you can:**\n" +
+                            "- **Option 1 (100% Offline):** Tap the **Models** tab and click the **Download** button to download the weights file onto your $phoneModelFriendly's local storage.\n" +
+                            "- **Option 2 (Cloud Hybrid):** Open the **Settings** panel and input a **Gemini API Key** to stream live responses via cloud fallback while your local downloads are in progress."
+                }
             }
 
             // Let's calculate simulation speeds based on selected execution provider and model parameter specs
