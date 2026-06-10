@@ -203,10 +203,15 @@ class LlmViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun isInternetConnected(context: Context): Boolean {
-        val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-        val network = connectivityManager.activeNetwork ?: return false
-        val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return false
-        return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+        return try {
+            val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+            val network = connectivityManager.activeNetwork ?: return false
+            val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return false
+            capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+        } catch (e: Exception) {
+            // Safe fallback: let user download proceed offline/online if network state checks fail
+            true
+        }
     }
 
     fun runModelBenchmark(modelId: String) {
