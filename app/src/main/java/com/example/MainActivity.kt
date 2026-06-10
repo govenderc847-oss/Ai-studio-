@@ -1,0 +1,1624 @@
+package com.example
+
+import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.*
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.data.database.ChatMessage
+import com.example.data.database.ChatThread
+import com.example.data.database.DownloadedModel
+import com.example.ui.theme.MyApplicationTheme
+import com.example.ui.viewmodel.LlmViewModel
+import com.example.util.PhoneSpecs
+import kotlinx.coroutines.launch
+
+// High-performance extensions on ColorScheme to deliver specialized developer colors
+val ColorScheme.lightText: Color get() = Color(0xFFF0F6FC)
+val ColorScheme.mutedText: Color get() = Color(0xFF8B949E)
+
+class MainActivity : ComponentActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
+        setContent {
+            MyApplicationTheme {
+                LlmStudioApp()
+            }
+        }
+    }
+}
+
+@Composable
+fun LlmStudioApp() {
+    val viewModel: LlmViewModel = viewModel()
+    val currentTab by viewModel.currentTab.collectAsStateWithLifecycle()
+    val configuration = LocalConfiguration.current
+    val isTablet = configuration.screenWidthDp >= 640
+
+    Scaffold(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .statusBarsPadding()
+            .navigationBarsPadding(),
+        bottomBar = {
+            if (!isTablet) {
+                NavigationBar(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    tonalElevation = 6.dp,
+                    windowInsets = WindowInsets.navigationBars
+                ) {
+                    NavigationBarItem(
+                        selected = currentTab == 0,
+                        onClick = { viewModel.selectTab(0) },
+                        icon = { Icon(Icons.Default.ChatBubble, contentDescription = "Chats") },
+                        label = { Text("Playground") },
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = MaterialTheme.colorScheme.primary,
+                            selectedTextColor = MaterialTheme.colorScheme.primary,
+                            indicatorColor = MaterialTheme.colorScheme.surfaceVariant
+                        ),
+                        modifier = Modifier.testTag("tab_chats")
+                    )
+                    NavigationBarItem(
+                        selected = currentTab == 1,
+                        onClick = { viewModel.selectTab(1) },
+                        icon = { Icon(Icons.Default.CloudDownload, contentDescription = "Models") },
+                        label = { Text("Models") },
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = MaterialTheme.colorScheme.primary,
+                            selectedTextColor = MaterialTheme.colorScheme.primary,
+                            indicatorColor = MaterialTheme.colorScheme.surfaceVariant
+                        ),
+                        modifier = Modifier.testTag("tab_models")
+                    )
+                    NavigationBarItem(
+                        selected = currentTab == 2,
+                        onClick = { viewModel.selectTab(2) },
+                        icon = { Icon(Icons.Default.Settings, contentDescription = "Settings") },
+                        label = { Text("Settings") },
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = MaterialTheme.colorScheme.primary,
+                            selectedTextColor = MaterialTheme.colorScheme.primary,
+                            indicatorColor = MaterialTheme.colorScheme.surfaceVariant
+                        ),
+                        modifier = Modifier.testTag("tab_settings")
+                    )
+                }
+            }
+        }
+    ) { paddingValues ->
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+        ) {
+            // Adaptive Navigation Drawer for large width screens (Tablets/Landscape)
+            if (isTablet) {
+                NavigationRail(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    modifier = Modifier.fillMaxHeight(),
+                    header = {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier.padding(vertical = 16.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Memory,
+                                contentDescription = "LLM Studio Logo",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(32.dp)
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                "LLM Studio",
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.titleSmall,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                ) {
+                    NavigationRailItem(
+                        selected = currentTab == 0,
+                        onClick = { viewModel.selectTab(0) },
+                        icon = { Icon(Icons.Default.ChatBubble, contentDescription = "Chats") },
+                        label = { Text("Playground") },
+                        colors = NavigationRailItemDefaults.colors(
+                            selectedIconColor = MaterialTheme.colorScheme.primary,
+                            indicatorColor = MaterialTheme.colorScheme.surfaceVariant
+                        )
+                    )
+                    NavigationRailItem(
+                        selected = currentTab == 1,
+                        onClick = { viewModel.selectTab(1) },
+                        icon = { Icon(Icons.Default.CloudDownload, contentDescription = "Models") },
+                        label = { Text("Catalog") },
+                        colors = NavigationRailItemDefaults.colors(
+                            selectedIconColor = MaterialTheme.colorScheme.primary,
+                            indicatorColor = MaterialTheme.colorScheme.surfaceVariant
+                        )
+                    )
+                    NavigationRailItem(
+                        selected = currentTab == 2,
+                        onClick = { viewModel.selectTab(2) },
+                        icon = { Icon(Icons.Default.Settings, contentDescription = "Settings") },
+                        label = { Text("Settings") },
+                        colors = NavigationRailItemDefaults.colors(
+                            selectedIconColor = MaterialTheme.colorScheme.primary,
+                            indicatorColor = MaterialTheme.colorScheme.surfaceVariant
+                        )
+                    )
+                }
+            }
+
+            Box(modifier = Modifier.fillMaxSize()) {
+                when (currentTab) {
+                    0 -> ChatPlaygroundScreen(viewModel, isTablet)
+                    1 -> ModelsCatalogScreen(viewModel)
+                    2 -> SettingsAndHardwareScreen(viewModel)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ChatPlaygroundScreen(viewModel: LlmViewModel, isTablet: Boolean) {
+    val chatThreads by viewModel.chatThreads.collectAsStateWithLifecycle()
+    val activeThreadId by viewModel.activeThreadId.collectAsStateWithLifecycle()
+    val activeMessages by viewModel.activeMessages.collectAsStateWithLifecycle()
+    val isGenerating by viewModel.isGenerating.collectAsStateWithLifecycle()
+    val activeModelId by viewModel.activeModelId.collectAsStateWithLifecycle()
+    val models by viewModel.models.collectAsStateWithLifecycle()
+
+    val coroutineScope = rememberCoroutineScope()
+    var promptInput by remember { mutableStateOf("") }
+    val keyboardController = LocalSoftwareKeyboardController.current
+
+    // Sidebar overlay in landscape mode
+    Row(modifier = Modifier.fillMaxSize()) {
+        if (isTablet) {
+            // Persistent sidebar showing chat history list on large screens
+            Column(
+                modifier = Modifier
+                    .width(280.dp)
+                    .fillMaxHeight()
+                    .background(MaterialTheme.colorScheme.surface)
+                    .border(width = 1.dp, color = MaterialTheme.colorScheme.outline, shape = RoundedCornerShape(0.dp))
+                    .padding(12.dp)
+            ) {
+                Button(
+                    onClick = {
+                        val firstDl = models.find { it.isDownloaded } ?: models.firstOrNull()
+                        firstDl?.let { viewModel.createNewChat(it.id) }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("btn_sidebar_new_chat"),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("New Chat Session")
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    "SESSIONS",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(start = 8.dp, bottom = 8.dp)
+                )
+                LazyColumn(modifier = Modifier.fillMaxSize()) {
+                    items(chatThreads, key = { it.id }) { thread ->
+                        ChatThreadRow(
+                            thread = thread,
+                            isSelected = thread.id == activeThreadId,
+                            onSelect = { viewModel.selectThread(thread.id) },
+                            onDelete = { viewModel.deleteThread(thread) }
+                        )
+                    }
+                }
+            }
+        }
+
+        // Action Core Playground Area
+        Column(
+            modifier = Modifier
+                .fillMaxHeight()
+                .weight(1f)
+                .background(MaterialTheme.colorScheme.background)
+        ) {
+            // Interactive Mini Header for Active Model and stats
+            ActiveChatHeader(
+                viewModel = viewModel,
+                activeModelId = activeModelId,
+                models = models,
+                chatThreads = chatThreads,
+                activeThreadId = activeThreadId,
+                isTablet = isTablet
+            )
+
+            // Dynamic conversation viewport
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+            ) {
+                if (activeThreadId == null || chatThreads.isEmpty()) {
+                    EmptyChatState { selectedModelId ->
+                        viewModel.createNewChat(selectedModelId)
+                    }
+                } else {
+                    val listState = rememberLazyListState()
+
+                    // Scroll to bottom every time a message is added or streamed
+                    LaunchedEffect(activeMessages.size, isGenerating) {
+                        if (activeMessages.isNotEmpty()) {
+                            listState.animateScrollToItem(activeMessages.size - 1)
+                        }
+                    }
+
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 16.dp),
+                        contentPadding = PaddingValues(top = 16.dp, bottom = 120.dp)
+                    ) {
+                        items(activeMessages, key = { it.id }) { message ->
+                            ChatMessageBubble(message = message, phoneSpecs = viewModel.phoneSpecs)
+                        }
+                        if (isGenerating && activeMessages.lastOrNull()?.sender == "user") {
+                            item {
+                                AssistantLoadingBubble()
+                            }
+                        }
+                    }
+                }
+
+                // Cozy Bottom floating visual panel of prompt suggestions
+                if (activeMessages.isEmpty() && activeThreadId != null) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .padding(bottom = 96.dp)
+                    ) {
+                        SuggestionRow { tappedPrompt ->
+                            promptInput = tappedPrompt
+                        }
+                    }
+                }
+            }
+
+            // Input Send Field Frame
+            if (activeThreadId != null) {
+                Surface(
+                    color = MaterialTheme.colorScheme.surface,
+                    tonalElevation = 4.dp,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(
+                            onClick = {
+                                val model = models.find { it.id == activeModelId }
+                                model?.let {
+                                    promptInput = "Under ${viewModel.selectedProvider.value}, analyze structural performance metrics of ${it.name} models on custom ${viewModel.phoneSpecs.cpuCores}-core chips."
+                                }
+                            },
+                            modifier = Modifier.size(48.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.AutoAwesome,
+                                contentDescription = "Quick Query Prompt Helper",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+
+                        TextField(
+                            value = promptInput,
+                            onValueChange = { promptInput = it },
+                            placeholder = { Text("Ask local model anything...", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)) },
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("chat_input"),
+                            colors = TextFieldDefaults.colors(
+                                focusedContainerColor = Color.Transparent,
+                                unfocusedContainerColor = Color.Transparent,
+                                disabledContainerColor = Color.Transparent,
+                                focusedIndicatorColor = Color.Transparent,
+                                unfocusedIndicatorColor = Color.Transparent
+                            ),
+                            keyboardOptions = KeyboardOptions(
+                                imeAction = ImeAction.Send
+                            ),
+                            keyboardActions = KeyboardActions(
+                                onSend = {
+                                    if (promptInput.isNotBlank() && !isGenerating) {
+                                        viewModel.sendMessageInActiveThread(promptInput)
+                                        promptInput = ""
+                                        keyboardController?.hide()
+                                    }
+                                }
+                            ),
+                            enabled = !isGenerating,
+                            maxLines = 4
+                        )
+
+                        Spacer(modifier = Modifier.width(8.dp))
+
+                        IconButton(
+                            onClick = {
+                                if (promptInput.isNotBlank() && !isGenerating) {
+                                    viewModel.sendMessageInActiveThread(promptInput)
+                                    promptInput = ""
+                                    keyboardController?.hide()
+                                }
+                            },
+                            modifier = Modifier
+                                .size(48.dp)
+                                .background(
+                                    color = if (promptInput.isNotBlank() && !isGenerating) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
+                                    shape = CircleShape
+                                )
+                                .testTag("chat_send_button"),
+                            enabled = promptInput.isNotBlank() && !isGenerating
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Send,
+                                contentDescription = "Send prompt button",
+                                tint = if (promptInput.isNotBlank() && !isGenerating) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ActiveChatHeader(
+    viewModel: LlmViewModel,
+    activeModelId: String,
+    models: List<DownloadedModel>,
+    chatThreads: List<ChatThread>,
+    activeThreadId: Int?,
+    isTablet: Boolean
+) {
+    var dropdownExpanded by remember { mutableStateOf(false) }
+    var renameExpanded by remember { mutableStateOf(false) }
+    var selectedModelDetails = models.find { it.id == activeModelId }
+
+    Surface(
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 2.dp,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (!isTablet) {
+                // Interactive bottom-sheet styled model list trigger
+                Row(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable { dropdownExpanded = true }
+                        .padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = selectedModelDetails?.name ?: "No model selected",
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.lightText,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Icon(
+                                Icons.Default.ArrowDropDown,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .padding(end = 6.dp)
+                                    .size(8.dp)
+                                    .background(
+                                        if (selectedModelDetails?.isDownloaded == true) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.secondary,
+                                        CircleShape
+                                    )
+                            )
+                            Text(
+                                text = if (selectedModelDetails?.isDownloaded == true) "Local [INT4 Quantized]" else "Cloud Gateway [Direct REST API]",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.mutedText
+                            )
+                        }
+                    }
+
+                    DropdownMenu(
+                        expanded = dropdownExpanded,
+                        onDismissRequest = { dropdownExpanded = false },
+                        modifier = Modifier.background(MaterialTheme.colorScheme.surfaceVariant)
+                    ) {
+                        models.forEach { m ->
+                            DropdownMenuItem(
+                                text = {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(m.name, color = MaterialTheme.colorScheme.onBackground)
+                                        if (m.isDownloaded) {
+                                            Text(
+                                                "Offline",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.tertiary,
+                                                modifier = Modifier.padding(start = 8.dp)
+                                            )
+                                        }
+                                    }
+                                },
+                                onClick = {
+                                    viewModel.createNewChat(m.id)
+                                    dropdownExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+            } else {
+                // Tablet header (Simple name and specs row)
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = selectedModelDetails?.name ?: "No Model Selected",
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.lightText
+                    )
+                    Text(
+                        text = "Quantization: ${selectedModelDetails?.quantization ?: "N/A"} • Accelerator: ${viewModel.selectedProvider.value}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.mutedText
+                    )
+                }
+            }
+
+            // Quick Hardware Profile Tag! Displays phone specification rating and warning highlights
+            Surface(
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier.padding(horizontal = 4.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Bolt,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = viewModel.selectedProvider.value.split("-").last(),
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+
+            // Active session drop anchor list menu
+            if (!isTablet && chatThreads.isNotEmpty()) {
+                var sessionMenuExpanded by remember { mutableStateOf(false) }
+                IconButton(onClick = { sessionMenuExpanded = true }) {
+                    Icon(
+                        Icons.Default.MoreVert,
+                        contentDescription = "Session Manager Options",
+                        tint = MaterialTheme.colorScheme.mutedText
+                    )
+                }
+
+                DropdownMenu(
+                    expanded = sessionMenuExpanded,
+                    onDismissRequest = { sessionMenuExpanded = false },
+                    modifier = Modifier.background(MaterialTheme.colorScheme.surfaceVariant)
+                ) {
+                    chatThreads.forEach { thread ->
+                        DropdownMenuItem(
+                            text = {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = thread.title,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        color = if (thread.id == activeThreadId) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground
+                                    )
+                                    IconButton(
+                                        onClick = { viewModel.deleteThread(thread) },
+                                        modifier = Modifier.size(24.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Delete,
+                                            contentDescription = "Delete Chat Thread",
+                                            tint = Color.Red.copy(alpha = 0.7f),
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                }
+                            },
+                            onClick = {
+                                viewModel.selectThread(thread.id)
+                                sessionMenuExpanded = false
+                            }
+                        )
+                    }
+                    Divider()
+                    DropdownMenuItem(
+                        text = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.Add, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("New Session", color = MaterialTheme.colorScheme.primary)
+                            }
+                        },
+                        onClick = {
+                            viewModel.createNewChat(activeModelId)
+                            sessionMenuExpanded = false
+                        }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun EmptyChatState(onStartChat: (String) -> Unit) {
+    val suggestedModels = listOf(
+        Triple("gemma-2b-it", "Gemma 2B", "Google's optimized compiler model"),
+        Triple("tinyllama-1.1b-instruct", "TinyLlama 1.1B", "Fast, low footprint model"),
+        Triple("phi-3-mini", "Phi-3 Mini", "High logic Microsoft edge model")
+    )
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(32.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Icon(
+            imageVector = Icons.Default.Terminal,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
+            modifier = Modifier.size(80.dp)
+        )
+        Spacer(modifier = Modifier.height(20.dp))
+        Text(
+            "Welcome to LLM Studio Mobile",
+            fontWeight = FontWeight.Bold,
+            style = MaterialTheme.typography.headlineMedium,
+            color = MaterialTheme.colorScheme.primary
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            "To begin local on-device weight compilation, select a pre-seeded target model to spin up a standalone playground thread.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.mutedText,
+            lineHeight = 20.sp,
+            modifier = Modifier.padding(horizontal = 16.dp)
+        )
+        Spacer(modifier = Modifier.height(28.dp))
+
+        Text(
+            "SPIN UP A LOCAL THREAD",
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+
+        suggestedModels.forEach { (id, name, desc) ->
+            Card(
+                onClick = { onStartChat(id) },
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 6.dp)
+                    .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.4f), RoundedCornerShape(12.dp)),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Default.Memory,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.secondary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(name, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.lightText)
+                        Text(desc, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.mutedText)
+                    }
+                    Icon(Icons.Default.AddCircleOutline, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ChatThreadRow(
+    thread: ChatThread,
+    isSelected: Boolean,
+    onSelect: () -> Unit,
+    onDelete: () -> Unit
+) {
+    Surface(
+        color = if (isSelected) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent,
+        shape = RoundedCornerShape(8.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp)
+            .clickable { onSelect() }
+    ) {
+        Row(
+            modifier = Modifier.padding(10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                Icons.Default.ChatBubbleOutline,
+                contentDescription = null,
+                tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.mutedText,
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Text(
+                text = thread.title,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                color = if (isSelected) MaterialTheme.colorScheme.lightText else MaterialTheme.colorScheme.onBackground,
+                modifier = Modifier.weight(1f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            IconButton(
+                onClick = { onDelete() },
+                modifier = Modifier.size(24.dp)
+            ) {
+                Icon(
+                    Icons.Default.DeleteOutline,
+                    contentDescription = "Delete",
+                    tint = Color.Red.copy(alpha = 0.62f),
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun ChatMessageBubble(message: ChatMessage, phoneSpecs: PhoneSpecs) {
+    val isUser = message.sender == "user"
+    val backgroundBrush = if (isUser) {
+        Brush.linearGradient(
+            colors = listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.secondary)
+        )
+    } else {
+        Brush.linearGradient(
+            colors = listOf(MaterialTheme.colorScheme.surface, MaterialTheme.colorScheme.surface)
+        )
+    }
+
+    val alignment = if (isUser) Alignment.End else Alignment.Start
+    val shape = if (isUser) {
+        RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp, bottomStart = 16.dp, bottomEnd = 2.dp)
+    } else {
+        RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp, bottomStart = 2.dp, bottomEnd = 16.dp)
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        horizontalAlignment = alignment
+    ) {
+        Box(
+            modifier = Modifier
+                .widthIn(max = 310.dp)
+                .background(backgroundBrush, shape)
+                .border(
+                    width = if (isUser) 0.dp else 1.dp,
+                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                    shape = shape
+                )
+                .padding(14.dp)
+        ) {
+            Column {
+                if (!isUser) {
+                    Text(
+                        text = "LOCAL MODEL RESPONSE",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                        letterSpacing = 1.sp,
+                        modifier = Modifier.padding(bottom = 6.dp)
+                    )
+                }
+
+                val content = message.content
+                if (!isUser && content.contains("```")) {
+                    MarkdownCodeFormatter(content)
+                } else {
+                    Text(
+                        text = content,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = if (isUser) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+                        lineHeight = 22.sp
+                    )
+                }
+            }
+        }
+
+        // Immersive diagnostics overlay details for local executing metrics
+        if (!isUser && message.tokensPerSecond != null) {
+            Row(
+                modifier = Modifier
+                    .padding(top = 4.dp, start = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    Icons.Default.Speed,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.mutedText,
+                    modifier = Modifier.size(12.dp)
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = "${"%.1f".format(message.tokensPerSecond)} t/s  •  TTFT: ${message.timeToFirstTokenMs}ms  •  Engine: ${message.executionProvider ?: "CPU"}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.mutedText
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun MarkdownCodeFormatter(content: String) {
+    val items = content.split("```")
+    Column {
+        items.forEachIndexed { idx, part ->
+            if (idx % 2 == 1) {
+                // Code block payload
+                val codeWithLang = part.trim()
+                val lines = codeWithLang.split("\n")
+                val lang = lines.firstOrNull()?.take(8) ?: "code"
+                val codeBody = if (lines.size > 1) lines.drop(1).joinToString("\n") else codeWithLang
+
+                Surface(
+                    color = Color(0xFF07090C),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp)
+                        .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f), RoundedCornerShape(8.dp))
+                ) {
+                    Column(modifier = Modifier.padding(10.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = lang.uppercase(),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.secondary,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Icon(Icons.Default.Terminal, contentDescription = null, tint = MaterialTheme.colorScheme.mutedText, modifier = Modifier.size(14.dp))
+                        }
+                        Text(
+                            text = codeBody,
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 12.sp,
+                            color = Color(0xFFE2E8F0),
+                            lineHeight = 16.sp
+                        )
+                    }
+                }
+            } else {
+                if (part.isNotEmpty()) {
+                    Text(
+                        text = part,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        lineHeight = 22.sp
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun AssistantLoadingBubble() {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp)
+    ) {
+        Surface(
+            color = MaterialTheme.colorScheme.surface,
+            shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp, bottomStart = 2.dp, bottomEnd = 16.dp),
+            modifier = Modifier
+                .widthIn(max = 240.dp)
+                .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f), RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp, bottomStart = 2.dp, bottomEnd = 16.dp))
+                .padding(14.dp)
+        ) {
+            Column {
+                Text(
+                    "MODEL PIPELINE STATUS",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(
+                        "Compiling weights graph...",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.mutedText
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun SuggestionRow(onSelectPrompt: (String) -> Unit) {
+    val prompts = listOf(
+        "Explain INT4 quantization",
+        "Write a Kotlin Coroutine helper",
+        "Explain GPU vs CPU inference"
+    )
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        prompts.forEach { text ->
+            Surface(
+                color = MaterialTheme.colorScheme.surface,
+                shape = RoundedCornerShape(20.dp),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)),
+                modifier = Modifier
+                    .weight(1f)
+                    .clickable { onSelectPrompt(text) }
+            ) {
+                Box(
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = text,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        maxLines = 2,
+                        minLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ModelsCatalogScreen(viewModel: LlmViewModel) {
+    val models by viewModel.models.collectAsStateWithLifecycle()
+    val downloadMetrics by viewModel.downloadMetrics.collectAsStateWithLifecycle()
+    val phoneSpecs = viewModel.phoneSpecs
+
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .padding(horizontal = 16.dp),
+        contentPadding = PaddingValues(top = 16.dp, bottom = 32.dp)
+    ) {
+        // High-end hardware checking module (PROFILER)
+        item {
+            HardwareProfilerCard(phoneSpecs = phoneSpecs)
+            Spacer(modifier = Modifier.height(24.dp))
+            Text(
+                "AVAILABLE MOBILE MODELS",
+                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary,
+                letterSpacing = 1.sp,
+                modifier = Modifier.padding(bottom = 12.dp)
+            )
+        }
+
+        items(models, key = { it.id }) { model ->
+            val metrics = downloadMetrics[model.id]
+            val isRecommended = model.id == phoneSpecs.recommendedModelId
+
+            // Warning checking logic, e.g. if the user only has 4GB and model is 5GB weights
+            val totalRamGb = phoneSpecs.totalRamGb
+            val isRamHazard = (model.id == "phi-3-mini" && totalRamGb < 5.0) ||
+                    (model.id == "llama-3-8b-it" && totalRamGb < 9.0)
+
+            ModelCatalogRow(
+                model = model,
+                metrics = metrics,
+                isRecommended = isRecommended,
+                isRamHazard = isRamHazard,
+                onDownload = { viewModel.startDownload(model.id) },
+                onDelete = { viewModel.deleteDownloadedModel(model.id) },
+                onUse = { viewModel.createNewChat(model.id) }
+            )
+        }
+    }
+}
+
+@Composable
+fun HardwareProfilerCard(phoneSpecs: PhoneSpecs) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(
+                width = 1.dp,
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
+                shape = RoundedCornerShape(16.dp)
+            ),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Column(modifier = Modifier.padding(18.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Default.DeveloperMode,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(
+                        "HARDWARE DELEGATE PROFILER",
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.lightText
+                    )
+                }
+
+                Surface(
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                    shape = RoundedCornerShape(6.dp)
+                ) {
+                    Text(
+                        "VOUCHED BY SYSTEM",
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Black,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Row(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.weight(1f)) {
+                    ProfilerInfoItem(label = "PHONE MODEL", value = "${phoneSpecs.manufacturer} ${phoneSpecs.model}")
+                    Spacer(modifier = Modifier.height(10.dp))
+                    ProfilerInfoItem(label = "AVAILABLE METRICS", value = "${phoneSpecs.cpuCores} CPU Cores / ${phoneSpecs.cpuArch}")
+                }
+                Column(modifier = Modifier.weight(1f)) {
+                    ProfilerInfoItem(label = "PHYSICAL RAM", value = "${"%.2f".format(phoneSpecs.totalRamGb)} GB RAM")
+                    Spacer(modifier = Modifier.height(10.dp))
+                    ProfilerInfoItem(label = "STORAGE DELEGATION", value = "${"%.1f".format(phoneSpecs.freeStorageGb)} GB Free")
+                }
+            }
+
+            Divider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f), modifier = Modifier.padding(vertical = 14.dp))
+
+            // Shows a beautiful highlighted target recommendation
+            Column {
+                Text(
+                    "BEST SYSTEM MATCH",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.mutedText
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Default.Stars,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.tertiary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = phoneSpecs.recommendedModelName,
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.tertiary
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ProfilerInfoItem(label: String, value: String) {
+    Column {
+        Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.mutedText)
+        Text(value, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onBackground)
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+fun ModelCatalogRow(
+    model: DownloadedModel,
+    metrics: LlmViewModel.ModelDownloadMetrics?,
+    isRecommended: Boolean,
+    isRamHazard: Boolean,
+    onDownload: () -> Unit,
+    onDelete: () -> Unit,
+    onUse: () -> Unit
+) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp)
+            .border(
+                width = if (isRecommended) 1.5.dp else 1.dp,
+                color = when {
+                    isRecommended -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.5f)
+                    isRamHazard -> Color.Red.copy(alpha = 0.35f)
+                    else -> MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
+                },
+                shape = RoundedCornerShape(12.dp)
+            ),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            // Model title details and dynamic recommendation stars
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        model.name,
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.lightText
+                    )
+                    Text(
+                        "Params: ${model.parameterCount}  •  Quantization: ${model.quantization}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.mutedText
+                    )
+                }
+
+                // Star badge for recommended, and danger warning for RAM hazards
+                Row {
+                    if (isRecommended) {
+                        Surface(
+                            color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.12f),
+                            shape = RoundedCornerShape(6.dp),
+                            modifier = Modifier.padding(end = 6.dp)
+                        ) {
+                            Text(
+                                "BEST MATCH ⭐",
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.tertiary,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp)
+                            )
+                        }
+                    }
+
+                    if (isRamHazard) {
+                        Surface(
+                            color = Color.Red.copy(alpha = 0.12f),
+                            shape = RoundedCornerShape(6.dp)
+                        ) {
+                            Text(
+                                "RAM OUT OF RANGE ⚠️",
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.Red,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp)
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Description info block
+            Text(
+                model.description,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.mutedText,
+                lineHeight = 16.sp
+            )
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Action Row / Downloading bar specs
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "${"%.2f".format(model.sizeBytes.toDouble() / (1024 * 1024 * 1024))} GB Weights",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.secondary
+                )
+
+                if (model.isDownloaded) {
+                    Row {
+                        TextButton(
+                            onClick = { onDelete() },
+                            colors = ButtonDefaults.textButtonColors(contentColor = Color.Red.copy(alpha = 0.72f))
+                        ) {
+                            Icon(Icons.Default.DeleteSweep, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Delete File")
+                        }
+                        Button(
+                            onClick = { onUse() },
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text("Chat with Model", color = MaterialTheme.colorScheme.onPrimaryContainer)
+                        }
+                    }
+                } else if (model.isDownloading) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.End,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.End,
+                            modifier = Modifier.padding(end = 12.dp)
+                        ) {
+                            LinearProgressIndicator(
+                                progress = model.downloadProgress,
+                                modifier = Modifier
+                                    .width(100.dp)
+                                    .clip(RoundedCornerShape(4.dp)),
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            metrics?.let {
+                                Text(
+                                    "${it.progressPercent}% at ${"%.1f".format(it.speedMbSeconds)} MB/s",
+                                    fontSize = 10.sp,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+
+                        metrics?.let {
+                            Text(
+                                "${it.timeRemainingSeconds}s remaining",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.mutedText
+                            )
+                        }
+                    }
+                } else {
+                    Button(
+                        onClick = { onDownload() },
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.testTag("download_model_${model.id}")
+                    ) {
+                        Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Download Weights")
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun SettingsAndHardwareScreen(viewModel: LlmViewModel) {
+    val temp by viewModel.temperature.collectAsStateWithLifecycle()
+    val topKVal by viewModel.topK.collectAsStateWithLifecycle()
+    val topPVal by viewModel.topP.collectAsStateWithLifecycle()
+    val activeProvider by viewModel.selectedProvider.collectAsStateWithLifecycle()
+    val showEdgeOnly by viewModel.showEdgeGalleryOnly.collectAsStateWithLifecycle()
+    val customKey by viewModel.customApiKey.collectAsStateWithLifecycle()
+    val customUrl by viewModel.customModelUrl.collectAsStateWithLifecycle()
+    val customName by viewModel.customModelName.collectAsStateWithLifecycle()
+
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .padding(horizontal = 16.dp),
+        contentPadding = PaddingValues(top = 16.dp, bottom = 48.dp)
+    ) {
+        item {
+            Text(
+                "ADVANCED GENERATION SPECIFICATIONS",
+                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary,
+                letterSpacing = 1.sp,
+                modifier = Modifier.padding(bottom = 16.dp)
+            )
+
+            // Temperature Controller
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 6.dp)
+                    .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f), RoundedCornerShape(12.dp)),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Temperature", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.lightText)
+                        Text("${"%.2f".format(temp)}", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                    }
+                    Text(
+                        "Controls diversity of weights. Higher temperatures make output more creative but potentially unpredictable.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.mutedText,
+                        modifier = Modifier.padding(vertical = 6.dp)
+                    )
+                    Slider(
+                        value = temp,
+                        onValueChange = { viewModel.temperature.value = it },
+                        valueRange = 0.1f..2.0f,
+                        colors = SliderDefaults.colors(
+                            thumbColor = MaterialTheme.colorScheme.primary,
+                            activeTrackColor = MaterialTheme.colorScheme.primary
+                        )
+                    )
+                }
+            }
+
+            // Top-p and Top-k controllers
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                // Top-K Card
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    modifier = Modifier
+                        .weight(1f)
+                        .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f), RoundedCornerShape(12.dp)),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text("Top-K", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.lightText)
+                            Text("$topKVal", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                        }
+                        Slider(
+                            value = topKVal.toFloat(),
+                            onValueChange = { viewModel.topK.value = it.toInt() },
+                            valueRange = 1f..100f,
+                            colors = SliderDefaults.colors(thumbColor = MaterialTheme.colorScheme.primary)
+                        )
+                    }
+                }
+
+                // Top-P Card
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    modifier = Modifier
+                        .weight(1f)
+                        .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f), RoundedCornerShape(12.dp)),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text("Top-P", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.lightText)
+                            Text("${"%.2f".format(topPVal)}", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                        }
+                        Slider(
+                            value = topPVal,
+                            onValueChange = { viewModel.topP.value = it },
+                            valueRange = 0.1f..1.0f,
+                            colors = SliderDefaults.colors(thumbColor = MaterialTheme.colorScheme.primary)
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // Google AI Edge Execution backend settings
+            Text(
+                "GOOGLE AI EDGE / DELEGATE ENGINE",
+                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary,
+                letterSpacing = 1.sp,
+                modifier = Modifier.padding(bottom = 12.dp)
+            )
+
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 6.dp)
+                    .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f), RoundedCornerShape(12.dp)),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        "Inference Execution Core",
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.lightText,
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    Text(
+                        "Select which physical hardware layer LLM Studio executes tensor compilation on.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.mutedText,
+                        modifier = Modifier.padding(bottom = 12.dp)
+                    )
+
+                    val providers = listOf(
+                        "GPU-Vulkan" to "GPU Acceleration (MTL/Vulkan)",
+                        "CPU-TFLite" to "Standard Multi-Core CPU (9.6 t/s)",
+                        "NNAPI-Hexagon" to "NPU Neural Co-Processor (Qualcomm NNAPI)"
+                    )
+
+                    providers.forEach { (provId, provName) ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { viewModel.selectedProvider.value = provId }
+                                .padding(vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = activeProvider == provId,
+                                onClick = { viewModel.selectedProvider.value = provId },
+                                colors = RadioButtonDefaults.colors(selectedColor = MaterialTheme.colorScheme.primary)
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text(provName, color = MaterialTheme.colorScheme.onBackground)
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // Custom Cloud Google Gemini API Gateway Overrides
+            Text(
+                "CLOUD GATEWAY & DEVELOPMENT API",
+                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary,
+                letterSpacing = 1.sp,
+                modifier = Modifier.padding(bottom = 12.dp)
+            )
+
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 6.dp)
+                    .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f), RoundedCornerShape(12.dp)),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        "Configure Own Gemini API Key",
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.lightText
+                    )
+                    Text(
+                        "Allows the system to connect online for complex intelligence fallback when models are un-downloaded.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.mutedText,
+                        modifier = Modifier.padding(vertical = 4.dp)
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = customKey,
+                        onValueChange = { viewModel.customApiKey.value = it },
+                        label = { Text("Gemini API Overwrite Key") },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("api_key_field"),
+                        placeholder = { Text("AIzaSy...") },
+                        visualTransformation = PasswordVisualTransformation(),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = MaterialTheme.colorScheme.onBackground,
+                            unfocusedTextColor = MaterialTheme.colorScheme.onBackground,
+                            focusedBorderColor = MaterialTheme.colorScheme.primary
+                        )
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // HuggingFace model compiler registration
+            Text(
+                "HUGGINGFACE MODEL CUSTOM EXPORTER",
+                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary,
+                letterSpacing = 1.sp,
+                modifier = Modifier.padding(bottom = 12.dp)
+            )
+
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 6.dp)
+                    .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f), RoundedCornerShape(12.dp)),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        "Stream custom GGUF/WASM weights",
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.lightText
+                    )
+                    Text(
+                        "Input any valid Direct GGUF weights download link (HuggingFace Resolve URL) to load custom models into your mobile system.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.mutedText,
+                        modifier = Modifier.padding(vertical = 4.dp)
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    OutlinedTextField(
+                        value = customName,
+                        onValueChange = { viewModel.customModelName.value = it },
+                        label = { Text("Model Visual Designation Name") },
+                        modifier = Modifier.fillMaxWidth().testTag("custom_model_name"),
+                        placeholder = { Text("e.g. MyCustomGemma-3B") }
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    OutlinedTextField(
+                        value = customUrl,
+                        onValueChange = { viewModel.customModelUrl.value = it },
+                        label = { Text("Direct GGUF Weights URL") },
+                        modifier = Modifier.fillMaxWidth().testTag("custom_model_url"),
+                        placeholder = { Text("https://huggingface.co/...") }
+                    )
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    Button(
+                        onClick = { viewModel.registerCustomConfigAndDownload() },
+                        enabled = customUrl.isNotBlank(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("register_custom_url_btn"),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                    ) {
+                        Icon(Icons.Default.CloudDownload, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Register and Compile weights file", color = Color(0xFF040D14))
+                    }
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,6 @@
+{
+  "name": "LLM Studio Mobile",
+  "description": "Run and manage quantized local LLM models on your phone. Analyze hardware capacities, download edge models, and chat with local/cloud engines.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
