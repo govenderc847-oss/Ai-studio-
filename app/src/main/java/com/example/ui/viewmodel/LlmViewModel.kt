@@ -189,6 +189,34 @@ class LlmViewModel(application: Application) : AndroidViewModel(application) {
     init {
         viewModelScope.launch {
             repository.checkAndSeedModels()
+            
+            // Real-time synchronization of model download states with actual physical files on device storage
+            val parentDir = File(getApplication<Application>().getExternalFilesDir(null), "LLM_Studio")
+            val modelsDir = File(parentDir, "models")
+            if (modelsDir.exists()) {
+                val dbModels = repository.allModels.first()
+                dbModels.forEach { m ->
+                    val filename = if (m.id.contains(".") || m.id.endsWith(".gguf") || m.id.endsWith(".bin") || m.id.endsWith(".onnx") || m.id.endsWith(".json")) {
+                        m.id
+                    } else {
+                        "${m.id}.bin"
+                    }
+                    val modelFile = File(modelsDir, filename)
+                    // If file exists and size is reasonably real (e.g. at least 5 MB)
+                    val actuallyExists = modelFile.exists() && modelFile.length() > 5 * 1024 * 1024
+                    if (actuallyExists != m.isDownloaded) {
+                        repository.updateModelDownloadState(m.id, isDownloaded = actuallyExists, isDownloading = false, progress = if (actuallyExists) 1.0f else 0.0f)
+                    }
+                }
+            } else {
+                val dbModels = repository.allModels.first()
+                dbModels.forEach { m ->
+                    if (m.isDownloaded) {
+                        repository.updateModelDownloadState(m.id, isDownloaded = false, isDownloading = false, progress = 0.0f)
+                    }
+                }
+            }
+
             // Reactively collect threads once to select the initial active thread
             repository.allThreads.collect { threads ->
                 if (threads.isNotEmpty() && !hasInitializedActiveThread) {
@@ -396,7 +424,7 @@ class LlmViewModel(application: Application) : AndroidViewModel(application) {
                 val filename = if (modelId.contains(".") || modelId.endsWith(".gguf") || modelId.endsWith(".bin") || modelId.endsWith(".onnx") || modelId.endsWith(".json")) {
                     modelId
                 } else {
-                    "$modelId.gguf"
+                    "$modelId.bin"
                 }
                 val destinationFile = File(modelsDir, filename)
                 
@@ -653,7 +681,7 @@ class LlmViewModel(application: Application) : AndroidViewModel(application) {
                 val filename = if (currentModelId!!.contains(".") || currentModelId.endsWith(".gguf") || currentModelId.endsWith(".bin") || currentModelId.endsWith(".onnx") || currentModelId.endsWith(".json")) {
                     currentModelId
                 } else {
-                    "$currentModelId.gguf"
+                    "$currentModelId.bin"
                 }
                 val modelFile = java.io.File(modelsDir, filename)
                 

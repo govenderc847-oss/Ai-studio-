@@ -23,7 +23,7 @@ class LlmRepository(
                 quantization = "Q4_K_M (INT4)",
                 sizeBytes = 680_000_000L,
                 description = "Ultra-lightweight chatbot. Optimized to run fluidly on low-end ARM CPUs. Consumes ~800MB RAM.",
-                isDownloaded = true,
+                isDownloaded = false,
                 customUrl = "https://huggingface.co/TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF/resolve/main/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf"
             ),
             DownloadedModel(
@@ -33,18 +33,28 @@ class LlmRepository(
                 quantization = "Q4_0 (INT4)",
                 sizeBytes = 980_000_000L,
                 description = "Highly capable multilingual model. Excellent reasoning-to-size ratio. Consumes ~1.2GB RAM.",
-                isDownloaded = true,
+                isDownloaded = false,
                 customUrl = "https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q2_k.gguf"
             ),
             DownloadedModel(
                 id = "gemma-2b-it",
-                name = "Gemma 2B Instruct (Google)",
+                name = "Gemma 2B Instruct (Google CPU)",
                 parameterCount = "2.1 Billion",
-                quantization = "Q4_K_S (INT4)",
-                sizeBytes = 1_450_000_000L,
-                description = "Google's open-weights model. Fantastic command following and general tasks. Consumes ~1.8GB RAM.",
-                isDownloaded = true,
-                customUrl = "https://huggingface.co/lmstudio-community/gemma-2B-it-GGUF/resolve/main/gemma-2b-it-q4_k_m.gguf"
+                quantization = "INT4 TFLite CPU (.bin)",
+                sizeBytes = 1_350_000_000L,
+                description = "Google's open-weights model optimized for CPUs. Running via official MediaPipe local hardware acceleration.",
+                isDownloaded = false,
+                customUrl = "https://huggingface.co/google/gemma-2b-it-cpu-int4/resolve/main/gemma-2b-it-cpu-int4.bin"
+            ),
+            DownloadedModel(
+                id = "gemma-2b-it-gpu",
+                name = "Gemma 2B Instruct (Google GPU)",
+                parameterCount = "2.1 Billion",
+                quantization = "INT4 Vulkan GPU (.bin)",
+                sizeBytes = 1_350_000_000L,
+                description = "Google's open-weights model optimized for mobile GPUs. Running via official MediaPipe local Vulkan hardware acceleration.",
+                isDownloaded = false,
+                customUrl = "https://huggingface.co/google/gemma-2b-it-gpu-int4/resolve/main/gemma-2b-it-gpu-int4.bin"
             ),
             DownloadedModel(
                 id = "gemma-4-2b-it",
@@ -93,12 +103,14 @@ class LlmRepository(
             if (existingModel == null) {
                 modelDao.insertModel(model)
             } else {
-                // To keep database in sync with user's configurations we heal existing records to defaults if required
-                val shouldForceDownloaded = model.id in listOf("tinyllama-1.1b-instruct", "qwen2.5-1.5b-chat", "gemma-2b-it")
-                val finalDownloaded = if (shouldForceDownloaded) true else existingModel.isDownloaded
+                // To keep database in sync with user's configurations we heal existing records to defaults if required (preserving download state)
                 modelDao.insertModel(existingModel.copy(
+                    name = model.name,
+                    description = model.description,
+                    quantization = model.quantization,
+                    sizeBytes = model.sizeBytes,
                     customUrl = model.customUrl,
-                    isDownloaded = finalDownloaded
+                    isDownloaded = existingModel.isDownloaded
                 ))
             }
         }
